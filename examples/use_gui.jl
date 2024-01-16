@@ -20,12 +20,9 @@ close(specfile)
 
 
 
-figurelist = init_fig()
-
-
-
-for i in figurelist
-    display(GLMakie.Screen(),i)
-end
+figlist = init_fig()
+obsdict = init_obs(im,spec,λ,figlist)
+imageviewer(figlist,obsdict)
+histogramviewer(im,figlist,obsdict)
 
 #fim,f = build_gui(im,spec,λ)

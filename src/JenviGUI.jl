@@ -20,83 +20,86 @@ function init_fig()
     f_image = Figure()
     f_histogram = Figure()
     f_spectra = Figure()
-    return f_image,f_histogram,f_spectra
+    return [f_image,f_histogram,f_spectra]
 end
 
 function init_obs(image::Array{<:AbstractFloat,3},spec::Array{<:AbstractFloat,3},wvl_vals::Vector{Float64},figure_list::Vector{Figure})
     f_image,f_histogram,f_spectra = figure_list
 
+    #Slider for adjusting the band that is being viewed
     band_slider = Slider(f_image[2,1],range=range(1,size(image,3)),startvalue=size(image,3),tellwidth=false)
     
-    band_string = lift(band_slider.value) do val
-        "Showing $(wvl_vals[val]) nm band"
-    end
 
+    #Observables related to band slider
+    band_index = lift(band_slider.value) do val
+        val
+    end
     band_image = lift(band_slider.value) do val
         image[:,:,val]
     end
-
-    histdata = lift(band_slider.value) do val
-        vec(image[:,:,val])
+    band_string = lift(band_slider.value) do val
+        "Showing $(wvl_vals[val]) nm band (#$(val))"
     end
+    histdata = @lift(vec($band_image))
 
-    hist_slider = IntervalSlider(f_hist[2,1],range=range(minimum(histdata),maximum(histdata),100),startvalues=(percentile(histdata,1),percentile(histdata,99)))
 
+    #Slider for adjusting histogram
+    hist_slider = IntervalSlider(f_histogram[2,1],range=@lift(range(minimum($histdata),maximum($histdata),100)),startvalues=@lift((percentile($histdata,1),percentile($histdata,99))))
+
+    bin_width = @lift(2*iqr($histdata)/(length($histdata))^(1/3))
+    bin_list = @lift(minimum($histdata):$bin_width:maximum($histdata))
+    bin_avg = @lift([($bin_list[i]+$bin_list[i+1])/2 for i ∈ eachindex($bin_list[1:end-1])])
+    #Observables related to histogram slider
     imstretch = lift(hist_slider.interval) do inter
         inter
     end
+    clist = @lift(map($bin_avg) do val
+                $(hist_slider.interval)[1] < val < $(hist_slider.interval)[2]
+            end)
+
+    println(clist)
+    
 
     obs_dict::Dict{String,Observable} = Dict(
-        "band_string"=>band_string,
-        "band_image"=>band_image,
-        "histdata"=>histdata,
-        "imstretch"=>imstretch
+        "band_index" => band_index,
+        "band_image" => band_image,
+        "band_string" => band_string,
+        "histdata" => histdata,
+        "imstretch" => imstretch,
+        "clist" => clist
         )
 
     return obs_dict
 
 end
 
-function imageviewer(image::Array{<:AbstractFloat,3},fig_list::Vector{Figure},obs_dict::Dict{String,Observable})
-    ax_im = GLMakie.Axis(f_image[1,1])
+function imageviewer(fig_list::Vector{Figure},obs_dict::Dict{String,Observable})
+    fig_image = fig_list[1]
+    ax_im = GLMakie.Axis(fig_image[1,1])
     ax_im.title = "Reflectance Image"
 
-    band_string = lift(sl.value) do val
-        "Showing $(wvl_vals[val]) nm band"
-    end
+    band_index = obs_dict["band_index"]
+    band_im = obs_dict["band_image"]
 
-    im = image!(ax_im,band_im,colorrange=imstretch,interpolate=false)
+    im = image!(ax_im,band_im,colorrange=obs_dict["imstretch"],interpolate=false)
 
-    Label(f_image[3,1],band_string,tellwidth=false)
+    Label(fig_image[3,1],obs_dict["band_string"],tellwidth=false)
 
-    return f_image
+    display(GLMakie.Screen(),fig_image)
 end
 
 function histogramviewer(image::Array{<:AbstractFloat,3},fig_list::Vector{Figure},obs_dict::Dict{String,Observable})
-    f_hist = Figure()
+    f_hist = fig_list[2]
     ax_hist = GLMakie.Axis(f_hist[1,1])
 
-    histdata = vec(image)
-
-    sl_exp = IntervalSlider(f_hist[2,1],range=range(minimum(histdata),maximum(histdata),100),startvalues=(percentile(histdata,1),percentile(histdata,99)))
-
-    imstretch = lift(sl_exp.interval) do inter
-        inter
-    end
-   
-    bin_width = 2*iqr(histdata)/(length(histdata))^(1/3)
-    bin_list = minimum(histdata):bin_width:maximum(histdata)
-    bin_avg = [(bin_list[i]+bin_list[i+1])/2 for i ∈ eachindex(bin_list[1:end-1])]
-    
-    clist = lift(sl_exp.interval) do inter
-        map(bin_avg) do val
-            inter[1] < val < inter[2]
-        end
-    end
+    histdata = obs_dict["histdata"]
+    clist = obs_dict["clist"]
+    bin_width = @lift(2*iqr($histdata)/(length($histdata))^(1/3))
+    bin_list = @lift(minimum($histdata):$bin_width:maximum($histdata))
 
     hist!(ax_hist,histdata,bins=bin_list,color=clist,colormap=[:transparent,:red],strokewidth=0.1)
 
-    return f_hist,imstretch
+    display(GLMakie.Screen(),f_hist)
 end
 
 function spectralviewer(spec_datasets::Vector{Array{<:AbstractFloat,3}},λs::Vector{Vector{Float64}})
