@@ -1,5 +1,6 @@
 module JENVI
 
-# Write your package code here.
+include("JenviGUI.jl")
+using .JenviGUI
 
 end
