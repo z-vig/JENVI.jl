@@ -1,10 +1,23 @@
 #JenviGUI.jl
 module JenviGUI
-export build_gui
+export ask_file,build_gui
 
 using GLMakie
 using StatsBase
 using PolygonOps
+using Gtk4
+
+function ask_file(start_folder::String)
+    path = open_dialog("Select Image to Visualize",start_folder=start_folder)
+    if isfile(path)
+        return path
+    else
+        println("Please Select a file")
+    end
+end
+
+function build_imageviewr(image_arr::Array{<:AbstractFloat,3})
+end
 
 function build_gui(image_arr::Array{<:AbstractFloat,3},spec_arr::Array{<:AbstractFloat,3},wvl_vals::Vector{Float64})
     im = image_arr[:,:,200]
