@@ -4,35 +4,54 @@ using HDF5
 using GLMakie
 using Statistics
 
-smoothfile = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gd_region_smoothed.hdf5")
-smoothim = read(smoothfile["gamma"])
-close(smoothfile)
 
-# impath = "C:/Users/zvig/.julia/dev/JENVI.jl/Data/gd_region_smoothed.hdf5"
-specpath = "C:/Users/zvig/.julia/dev/JENVI.jl/Data/gd_region_2p_removed.hdf5"
-impath = ask_file("./Data")
-#specpath = ask_file("./Data")
+function get_arrays()
 
-imfile = h5open(impath)
-im = read(imfile["gamma"])
-close(imfile)
+    h5file = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps.hdf5")
 
-# shadowmask = mean(smoothim,dims=3)[:,:,1].<0.05
-# im[shadowmask,:].=NaN
-# println(size(vec(im[isnan.(im).==true])))
+    # all_data = Vector{Array{Float64,3}}(undef,length(keys(h5file)))
+    all_data = Dict{String,Array{Float64,3}}()
 
-specfile = h5open(specpath)
-spec = read(specfile["gamma"])
-close(specfile)
+    for i ∈ eachindex(keys(h5file))
+        key = keys(h5file)[i]
+        arr = read(h5file[key])
+        if ndims(arr) < 3
+            arr = reshape(arr,(size(arr)...,1))
+        end
+        all_data[key] = arr
+    end
 
-λ = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/smoothed_wvl_data.txt"))]
-
+    close(h5file)
+    #println([size(all_data[i]) for i in eachindex(all_data)])
+    return all_data
+end
 
 
-figlist = init_fig()
-obsdict = init_obs(im,spec,λ,figlist)
-imfig,imax = imageviewer(figlist,obsdict)
-histogramviewer(im,figlist,obsdict)
-spectralviewer(spec,λ,imfig,imax)
+
+
+function build_gui()
+
+    datadict = get_arrays()
+
+    rawλ::Vector{Float64} = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/wvl_data.txt"))]
+    smoothλ::Vector{Float64} = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/smoothed_wvl_data.txt"))]
+
+    @time figdict = init_fig()
+    @time obsdict = init_obs(figdict,datadict,rawλ)
+    @time reflectanceviewer(figdict,obsdict)
+    @time histogramviewer(figdict,obsdict)
+    @time spectralviewer(figdict,obsdict,datadict,rawλ,smoothλ)
+
+    return nothing
+end
+
+@time build_gui()
+GC.gc()
+
+# @time figlist = init_fig()
+# @time obsdict = init_obs(im,spec,λ,figlist)
+# @time imfig,imax = reflectanceviewer(figlist,obsdict)
+# histogramviewer(im,figlist,obsdict)
+# spectralviewer(figlist,spec,λ,imax)
 
 #fim,f = build_gui(im,spec,λ)
