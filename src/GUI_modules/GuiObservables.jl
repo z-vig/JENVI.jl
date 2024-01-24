@@ -1,0 +1,3 @@
+module GUIObservables
+
+end #GUIObservables

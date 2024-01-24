@@ -6,6 +6,7 @@ using GLMakie
 using StatsBase
 using PolygonOps
 using Gtk4
+using ColorBrewer
 
 function ask_file(start_folder::String)
     path = open_dialog("Select Image to Visualize",parent(GtkWindow()),start_folder=start_folder)
@@ -29,6 +30,7 @@ function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float
     f_rfl = figdict["Reflectance"]
     f_hist = figdict["Histogram"]
     f_spec = figdict["Spectra"]
+    f_map = figdict["Map"]
     rflim = datadict["RawSpectra"]
 
     #Slider for adjusting the band that is being viewed on the reflectance image
@@ -44,7 +46,7 @@ function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float
     histdata = @lift(vec($rfl_band))
 
 
-    #Slider for adjusting histogram
+    #Slider for adjusting histogram of reflectance
     hist_slider = IntervalSlider(f_hist[2,1],range=@lift(range(minimum($histdata),maximum($histdata),100)),startvalues=@lift((percentile($histdata,1),percentile($histdata,99))))
 
     bin_width = @lift(2*iqr($histdata)/(length($histdata))^(1/3))
@@ -58,7 +60,6 @@ function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float
                 $(hist_slider.interval)[1] < val < $(hist_slider.interval)[2]
             end)
 
-
     #Menu for selecting spectra type
     specdict = Dict(i=>j for (i,j) in zip(keys(datadict),values(datadict)) if size(j,3)>1)
 
@@ -71,6 +72,35 @@ function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float
     spec_menu_selection = lift(spec_menu.selection) do x
         return x
     end
+
+    #Menu for selecting data map
+    mapdict = Dict(i=>j for (i,j) in zip(keys(datadict),values(datadict)) if size(j,3)==1)
+
+    map_menu = Menu(f_map[1,2],options=zip(keys(mapdict),values(mapdict)),default="IBD1000",tellheight=false,width=150)
+
+    map_menu_options = lift(map_menu.options) do x
+        return x
+    end
+    map_menu_selection = lift(map_menu.selection) do x
+        return x
+    end
+
+    #Slider for adjusting histogram of map
+    histdata_map = @lift(vec($map_menu_selection))
+
+    map_slider = IntervalSlider(f_hist[2,2],range=@lift(range(minimum($histdata_map),maximum($histdata_map),1000)),startvalues=@lift((percentile($histdata_map,1),percentile($histdata_map,99))))
+
+    bin_width = @lift(2*iqr($histdata_map)/(length($histdata_map))^(1/3))
+    bin_list = @lift(minimum($histdata_map):$bin_width:maximum($histdata_map))
+    bin_avg = @lift([($bin_list[i]+$bin_list[i+1])/2 for i ∈ eachindex($bin_list[1:end-1])])
+    #Observables related to histogram slider
+    imstretch_map = lift(map_slider.interval) do inter
+        inter
+    end
+    clist_map = @lift(map($bin_avg) do val
+                $(map_slider.interval)[1] < val < $(map_slider.interval)[2]
+            end)
+
     
     obs_dict::Dict{String,Observable} = Dict(
         "rfl_band" => rfl_band,
@@ -78,8 +108,13 @@ function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float
         "histdata" => histdata,
         "imstretch" => imstretch,
         "clist" => clist,
+        "histdata_map" => histdata_map,
+        "imstretch_map" => imstretch_map,
+        "clist_map" => clist_map,
         "spec_menu_options" => spec_menu_options,
-        "spec_menu_selection" => spec_menu_selection
+        "spec_menu_selection" => spec_menu_selection,
+        "map_menu_options" => map_menu_options,
+        "map_menu_selection" => map_menu_selection
         )
 
     return obs_dict
@@ -88,8 +123,9 @@ end
 
 function reflectanceviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observable})
     f_rfl = figdict["Reflectance"]
-    ax_rfl = GLMakie.Axis(f_rfl[1,1])
+    ax_rfl = GLMakie.Axis(f_rfl[1,1],width=900,height=900)
     ax_rfl.title = "Reflectance Image"
+    resize_to_layout!(f_rfl)
 
     rfl_band = obsdict["rfl_band"]
 
@@ -100,21 +136,39 @@ function reflectanceviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Obs
     display(GLMakie.Screen(),f_rfl)
 end
 
-function mapviewer(fig_list::Vector{Figure},obs_dict::Dict{String,Observable})
-    fig_map = fig_list[2]
+function mapviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observable},datadict::Dict{String,Array{Float64,3}})
+    f_map = figdict["Map"]
+    ax_map = GLMakie.Axis(f_map[1,1])
+
+    map_select = Observable{Array{Float64,2}}(datadict["IBD1000"][:,:,1])
+    on(obsdict["map_menu_selection"]) do sel
+        map_select[] = sel[:,:,1]
+    end
+    
+    image!(ax_map,map_select,colorrange=obsdict["imstretch_map"],interpolate=false,nan_color=:purple)
+    
+    display(GLMakie.Screen(),f_map)
 end
 
 function histogramviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observable})
 
     f_hist = figdict["Histogram"]
     ax_hist = GLMakie.Axis(f_hist[1,1])
+    ax_hist_map = GLMakie.Axis(f_hist[1,2])
 
     histdata = obsdict["histdata"]
     clist = obsdict["clist"]
     bin_width = @lift(2*iqr($histdata)/(length($histdata))^(1/3))
     bin_list = @lift(minimum($histdata):$bin_width:maximum($histdata))
 
+    histdata_map = obsdict["histdata_map"]
+    clist_map = obsdict["clist_map"]
+    bin_width_map = @lift(2*iqr($histdata_map)/(length($histdata_map))^(1/3))
+    bin_list_map = @lift(minimum($histdata_map):$bin_width_map:maximum($histdata_map))
+
     hist!(ax_hist,histdata,bins=bin_list,color=clist,colormap=[:transparent,:red],strokewidth=0.1)
+
+    hist!(ax_hist_map,histdata_map,bins=bin_list_map,color=clist_map,colormap=[:transparent,:Red],strokewidth=0.1)
 
     display(GLMakie.Screen(),f_hist)
 end
@@ -122,6 +176,9 @@ end
 function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observable},datadict::Dict{String,Array{Float64,3}},rawλ::Vector{Float64},smoothλ::Vector{Float64})
     f_spec = figdict["Spectra"]
     f_rfl = figdict["Reflectance"]
+    f_map = figdict["Map"]
+    colsize!(f_spec.layout,1,Fixed(600))
+    resize_to_layout!(f_spec)
 
     ax_spec = GLMakie.Axis(f_spec[1,1])
     xlims!(ax_spec,(minimum(rawλ),maximum(rawλ)))
@@ -129,7 +186,7 @@ function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observ
     ax_spec.ylabel = "Reflectance"
 
     spectra_select = Observable{Array{Float64,3}}(datadict["RawSpectra"])
-    λ_select = Observable{Vector{Float64}}(rawλ)
+    λ_select = Observable{Vector{Float64}}(smoothλ)
 
     on(obsdict["spec_menu_selection"]) do sel
         spectra_select[] = sel
@@ -138,7 +195,9 @@ function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observ
         elseif size(sel,3) == length(smoothλ)
             λ_select[] = smoothλ
         end
-        println("This is complete")
+        reset_limits!(ax_spec)
+        println(@lift(size($spectra_select)))
+        println(@lift(size($λ_select)))
     end
 
     imcoords =  vec([[x,y] for x in 1:size(to_value(spectra_select),1),y in 1:size(to_value(spectra_select),2)])
@@ -149,30 +208,48 @@ function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observ
     num_spectra = 0
     register_interaction!(f_rfl.content[2],:get_spectra) do event::MouseEvent,axis
         if event.type==MouseEventTypes.leftclick
-            if num_spectra<10
+            if num_spectra<9
                 num_spectra += 1
             else
                 num_spectra = 1
             end
             xpos = Int(round(event.data[1]))
             ypos = Int(round(event.data[2]))
-            println("X:$xpos, Y:$ypos")
-            pl = lines!(ax_spec,λ_select,@lift($(spectra_select)[xpos,ypos,:]),color=num_spectra,colormap=:tab10,colorrange=(1,10),linestyle=:dash)
-            ps = scatter!(f_rfl.content[2],xpos,ypos,color=num_spectra,colormap=:tab10,colorrange=(1,10),markersize=5)
+
+            pl = lines!(ax_spec,λ_select,@lift($(spectra_select)[xpos,ypos,:]),color=num_spectra,colormap=:Set1_9,colorrange=(1,9),linestyle=:dash)
+
+            ps = scatter!(f_rfl.content[2],xpos,ypos,color=num_spectra,colormap=:Set1_9,colorrange=(1,9),markersize=5)
             push!(pllist,pl)
             push!(pslist,ps)
+            println("X:$xpos, Y:$ypos")
         end
     end
 
-    slist = []
+    slist_rfl = []
+    slist_map = []
     coordlist::Vector{Tuple{Float64,Float64}} = []
-    register_interaction!(f_rfl.content[2],:area_spectra) do event::KeysEvent, axis
+    register_interaction!(f_rfl.content[2],:area_spectra_rfl) do event::KeysEvent, axis
         if all([i in event.keys for i in [Keyboard.q,Keyboard.left_shift]])
             mp = mouseposition(f_rfl.content[2])
             xpos = mp[1]
             ypos = mp[2]
-            s = scatter!(f_rfl.content[2],xpos,ypos,color=:Red)
-            push!(slist,s)
+            srfl = scatter!(f_rfl.content[2],xpos,ypos,color=:Red)
+            smap = scatter!(f_map.content[2],xpos,ypos,color=:Red)
+            push!(slist_rfl,srfl)
+            push!(slist_map,smap)
+            push!(coordlist,(xpos,ypos))
+        end
+    end
+
+    register_interaction!(f_map.content[2],:area_spectra_map) do event::KeysEvent, axis
+        if all([i in event.keys for i in [Keyboard.q,Keyboard.left_shift]])
+            mp = mouseposition(f_map.content[2])
+            xpos = mp[1]
+            ypos = mp[2]
+            srfl = scatter!(f_rfl.content[2],xpos,ypos,color=:Red)
+            smap = scatter!(f_map.content[2],xpos,ypos,color=:Red)
+            push!(slist_rfl,srfl)
+            push!(slist_map,smap)
             push!(coordlist,(xpos,ypos))
         end
     end
@@ -184,21 +261,28 @@ function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observ
 
     area_spectra_num = 0
     allist = []
+    allist_std = []
     poly_list = []
+    poly_list_map = []
     on(b_select.clicks) do x
-        if area_spectra_num<10
+        if area_spectra_num<9
             area_spectra_num += 1
         else
             area_spectra_num = 1
         end
 
-        for s in slist
+        for s in slist_rfl
+            s.color = :transparent
+        end
+        for s in slist_map
             s.color = :transparent
         end
 
         # println(length(coordlist))
-        p = poly!(f_rfl.content[2],coordlist,strokewidth=1,color=area_spectra_num,colormap=:tab10,colorrange=(1,10),alpha=0.5)
+        p = poly!(f_rfl.content[2],coordlist,strokewidth=1,color=area_spectra_num,colormap=:Set1_9,colorrange=(1,9),alpha=0.5)
+        pmap = poly!(f_map.content[2],coordlist,strokewidth=1,color=area_spectra_num,colormap=:Set1_9,colorrange=(1,9),alpha=0.5)
         push!(poly_list,p)
+        push!(poly_list_map,pmap)
 
         function run_inpolygon(pt)
             polyg = [[first(i),last(i)] for i in coordlist]
@@ -231,18 +315,31 @@ function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observ
             $(selected_spectra)[i,:] = $(spectra_select)[selection[i]...,:]
         end)
 
-        al = lines!(ax_spec,λ_select,@lift(vec(mean($(selected_spectra),dims=1))),color=area_spectra_num,colormap=:tab10,colorrange=(1,10))
+        μ = @lift(vec(mean($(selected_spectra),dims=1)))
+        σ = @lift(vec(std($(selected_spectra),dims=1)))
+
+        al_std = band!(ax_spec,λ_select,@lift($μ.-$σ),@lift($μ.+$σ),color=palette("Set1",9)[area_spectra_num],alpha=0.3)
+        
+        al = lines!(ax_spec,λ_select,μ,color=area_spectra_num,colormap=:Set1_9,colorrange=(1,9))
+
         
         push!(allist,al)
+        push!(allist_std,al_std)
         coordlist = []
     end
 
     on(b_clear.clicks) do x
-        for s in slist
+        for s in slist_rfl
             delete!(f_rfl.content[2],s)
+        end
+        for s in slist_map
+            delete!(f_map.content[2],s)
         end
         for p in poly_list
             delete!(f_rfl.content[2],p)
+        end
+        for p in poly_list_map
+            delete!(f_map.content[2],p)
         end
         for ps in pslist
             delete!(f_rfl.content[2],ps)
@@ -253,179 +350,22 @@ function spectralviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observ
         for al in allist
             delete!(ax_spec,al)
         end
+        for al_std in allist_std
+            delete!(ax_spec,al_std)
+        end
 
-        slist = []
+        slist_rfl = []
+        slist_map = []
         poly_list = []
+        poly_list_map = []
         pslist = []
         pllist = []
         allist = []
+        allist_std=[]
         coordlist = []
     end
 
     display(GLMakie.Screen(),f_spec)
 end
-
-function build_gui(image_arr::Array{<:AbstractFloat,3},spec_arr::Array{<:AbstractFloat,3},wvl_vals::Vector{Float64})
-    im = image_arr[:,:,200]
-    imcoords = vec([[x,y] for x in 1:size(im,1),y in 1:size(im,2)])
-    imcoords = hcat([i[1] for i in imcoords],[i[2] for i in imcoords])
-
-    f_image = Figure()
-    ax_im = GLMakie.Axis(f_image[1,1])
-    ax_im.title = "Reflectance Image"
-
-    f = Figure(size=(750,450))
-
-    ax1 = GLMakie.Axis(f[1,1])
-    ax2 = GLMakie.Axis(f[1,2])
-    
-    histdata = vec(im)
-
-    sl_exp = IntervalSlider(f[2,1],range=range(minimum(histdata),maximum(histdata),100),startvalues=(percentile(histdata,1),percentile(histdata,99)))
-
-    imstretch = lift(sl_exp.interval) do inter
-        inter
-    end
-   
-    bin_width = 2*iqr(histdata)/(length(histdata))^(1/3)
-    bin_list = minimum(histdata):bin_width:maximum(histdata)
-    bin_avg = [(bin_list[i]+bin_list[i+1])/2 for i ∈ eachindex(bin_list[1:end-1])]
-    
-    clist = lift(sl_exp.interval) do inter
-        map(bin_avg) do val
-            inter[1] < val < inter[2]
-        end
-    end
-
-    hist!(ax1,histdata,bins=bin_list,color=clist,colormap=[:transparent,:red],strokewidth=0.1)
-    im = image!(ax_im,im,colorrange=imstretch,interpolate=false)
-
-    pllist = []
-    pslist = []
-    num_spectra = 0
-    register_interaction!(ax_im,:get_spectra) do event::MouseEvent,axis
-        if event.type==MouseEventTypes.leftclick
-            if num_spectra<10
-                num_spectra += 1
-            else
-                num_spectra = 1
-            end
-            xpos = Int(round(event.data[1]))
-            ypos = Int(round(event.data[2]))
-            println("X:$xpos, Y:$ypos")
-            pl = lines!(ax2,wvl_vals,spec_arr[xpos,ypos,:],color=num_spectra,colormap=:tab10,colorrange=(1,10),linestyle=:dash)
-            ps = scatter!(ax_im,xpos,ypos,color=num_spectra,colormap=:tab10,colorrange=(1,10),markersize=5)
-    
-            push!(pllist,pl)
-            push!(pslist,ps)
-        end
-    end
-
-    slist = []
-    coordlist::Vector{Tuple{Float64,Float64}} = []
-    register_interaction!(ax_im,:area_spectra) do event::KeysEvent, axis
-        if all([i in event.keys for i in [Keyboard.q,Keyboard.left_shift]])
-            mp = mouseposition(ax_im)
-            xpos = mp[1]
-            ypos = mp[2]
-            s = scatter!(ax_im,xpos,ypos,color=:Red)
-            push!(slist,s)
-            push!(coordlist,(xpos,ypos))
-        end
-    end
-
-    f_image[2, 1] = buttongrid = GridLayout(tellwidth = false)
-    poly_list = []
-
-    b_select = Button(f_image,label="Plot Selection")
-    b_clear = Button(f_image,label="Clear Selection")
-    buttongrid[1,1:2] = [b_select,b_clear]
-
-    area_spectra_num = 0
-    allist = []
-    on(b_select.clicks) do x
-        if area_spectra_num<10
-            area_spectra_num += 1
-        else
-            area_spectra_num = 1
-        end
-
-        for s in slist
-            s.color = :transparent
-        end
-        println(length(coordlist))
-        p = poly!(ax_im,coordlist,strokewidth=1,color=area_spectra_num,colormap=:tab10,colorrange=(1,10),alpha=0.5)
-        push!(poly_list,p)
-
-        function run_inpolygon(pt)
-            polyg = [[first(i),last(i)] for i in coordlist]
-            push!(polyg,polyg[1])
-            return inpolygon(pt,polyg)
-        end
-        
-        formatted_coords = hcat([first(i) for i in coordlist],[last(i) for i in coordlist])
-        min_x = minimum(formatted_coords[:,1])
-        max_x = maximum(formatted_coords[:,1])
-        min_y = minimum(formatted_coords[:,2])
-        max_y = maximum(formatted_coords[:,2])
-
-        formatted_boxdata = []
-        for (x,y) in zip(imcoords[:,1],imcoords[:,2])
-            if x>min_x && x<max_x && y>min_y && y<max_y
-                push!(formatted_boxdata,[x,y])
-            end
-        end
-        inside_test = run_inpolygon.(formatted_boxdata)
-
-        selection = [(i[1],i[2]) for i in formatted_boxdata[inside_test.==1]]
-        formatted_boxdata = []
-
-        selected_spectra = zeros(length(selection),239)
-        for i in eachindex(selection)
-            selected_spectra[i,:] = spec_arr[selection[i]...,:]
-        end
-        #println(mean(selected_spectra,dims=1))
-        al = lines!(ax2,wvl_vals,vec(mean(selected_spectra,dims=1)),color=area_spectra_num,colormap=:tab10,colorrange=(1,10))
-        
-        push!(allist,al)
-        coordlist = []
-        
-    end
-
-    on(b_clear.clicks) do x
-        for s in slist
-            delete!(ax_im,s)
-        end
-        for p in poly_list
-            delete!(ax_im,p)
-        end
-        for ps in pslist
-            delete!(ax_im,ps)
-        end
-        for pl in pllist
-            delete!(ax2,pl)
-        end
-        for al in allist
-            delete!(ax2,al)
-        end
-
-        slist = []
-        poly_list = []
-        pslist = []
-        pllist = []
-        allist = []
-        coordlist = []
-    end
-    
-    butt = Button(f[2,2],label="Reset",tellwidth=false)
-    on(butt.clicks) do click
-        empty!(ax2)
-    end
-    display(GLMakie.Screen(),f_image)
-    display(GLMakie.Screen(),f)
-
-    return f_image,f
-end
-
 
 end #JenviGUI

@@ -22,6 +22,7 @@ function get_arrays()
     end
 
     close(h5file)
+    all_data["RawSpectra"] = all_data["RawSpectra"][:,:,5:end-4]
     #println([size(all_data[i]) for i in eachindex(all_data)])
     return all_data
 end
@@ -32,6 +33,7 @@ end
 function build_gui()
 
     datadict = get_arrays()
+    println(keys(datadict))
 
     rawλ::Vector{Float64} = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/wvl_data.txt"))]
     smoothλ::Vector{Float64} = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/smoothed_wvl_data.txt"))]
@@ -40,6 +42,7 @@ function build_gui()
     @time obsdict = init_obs(figdict,datadict,rawλ)
     @time reflectanceviewer(figdict,obsdict)
     @time histogramviewer(figdict,obsdict)
+    @time mapviewer(figdict,obsdict,datadict)
     @time spectralviewer(figdict,obsdict,datadict,rawλ,smoothλ)
 
     return nothing
