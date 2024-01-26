@@ -17,16 +17,6 @@ function ask_file(start_folder::String)
     end
 end
 
-function init_fig()
-    figdict = Dict{String,Figure}()
-    dictkeys = ["Reflectance","Map","Histogram","Spectra"]
-    for key ∈ dictkeys
-        figdict[key] = Figure()
-    end
-    return figdict
-end
-
-
 
 function reflectanceviewer(figdict::Dict{String,Figure},obsdict::Dict{String,Observable})
     f_rfl = figdict["Reflectance"]

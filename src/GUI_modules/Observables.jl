@@ -1,7 +1,45 @@
-module GUIObservables
-
 using GLMakie
-export init_obs
+using Statistics
+
+mutable struct GUIModule{T}
+    figure::Figure
+    data::Observable{T}
+end
+
+function band_selector!(mod::GUIModule,location::Tuple{Int,Int})
+    #Slider for adjusting the band that is being viewed on a multiple band image
+    _fig = mod.figure[location...]
+    _range = @lift(range(1,size($(mod.data),3)))
+    _startvalue = @lift(size($(mod.data),3))
+
+    band_slider = Slider(_fig,range=_range,startvalue=_startvalue,tellwidth=false)
+
+    return band_slider.value
+end
+
+function histogram_selector!(mod::GUIModule{Matrix{Float64}},location::Tuple{Int,Int})
+    #Slider for adjusting histogram of reflectance
+    histdata = @lift(vec($(mod.data)))
+    _fig = mod.figure[location...]
+    _range = @lift(range(minimum($histdata),maximum($histdata),100))
+    _startvals = @lift((percentile($histdata,1),percentile($histdata,99)))
+
+    hist_slider = IntervalSlider(_fig,range=_range,startvalues=_startvals)
+
+    bin_width = @lift(2*iqr($histdata)/(length($histdata))^(1/3))
+    bin_edges = @lift(minimum($histdata):$bin_width:maximum($histdata))
+    bin_avg = @lift([($bin_list[i]+$bin_list[i+1])/2 for i ∈ eachindex($bin_list[1:end-1])])
+
+    #Observables related to histogram slider
+    imstretch = lift(hist_slider.interval) do inter
+        inter
+    end
+    bin_colors = @lift(map($bin_avg) do val
+                $(hist_slider.interval)[1] < val < $(hist_slider.interval)[2]
+            end)
+
+    return hist_slider.interval,imstretch,bin_edges,bin_colors
+end
 
 function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float64,3}},rawλ::Vector{Float64})
     f_rfl = figdict["Reflectance"]
@@ -97,5 +135,3 @@ function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float
     return obs_dict
 
 end
-
-end #GUIObservables

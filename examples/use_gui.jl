@@ -4,7 +4,6 @@ using HDF5
 using GLMakie
 using Statistics
 
-
 function get_arrays()
 
     h5file = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps.hdf5")
