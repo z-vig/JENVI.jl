@@ -3,6 +3,8 @@
 Here we define the struct for loading in image data.
 """
 
+using GLMakie
+
 struct ImageData{T}
     name::String
     array::Array{T}

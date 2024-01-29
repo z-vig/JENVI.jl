@@ -3,17 +3,25 @@ using GLMakie
 using HDF5
 
 function load_data()
-    h5file = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps.hdf5")
+    λ = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/smoothed_wvl_data.txt"))]
+
+    h5file1 = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/shadow_bits.hdf5")
+    shadow_mask = Bool.(read(h5file1["gamma"]))
+    close(h5file1)
+
+    h5file2 = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps.hdf5")
     all_data = Dict{String,Array{Float64,3}}()
-    for i ∈ eachindex(keys(h5file))
-        key = keys(h5file)[i]
-        arr = read(h5file[key])
+    for i ∈ eachindex(keys(h5file2))
+        key = keys(h5file2)[i]
+        arr = read(h5file2[key])
         if ndims(arr) < 3
             arr = reshape(arr,(size(arr)...,1))
         end
-        all_data[key] = arr
+        all_data[key] = ImageData(key,arr,shadow_mask,λ)
     end
-    close(h5file)
+    close(h5file2)
+
+    return nothing
 end
 
 function run_gui()
@@ -22,10 +30,6 @@ function run_gui()
     specdata = Dict(i=>j for (i,j) in zip(keys(all_data),values(all_data)) if size(j,3)>1)
 
     mapdata = Dict(i=>j[:,:,1] for (i,j) in zip(keys(all_data),values(all_data)) if size(j,3)==1)
-
-    h5file2 = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/shadow_bits.hdf5")
-    shadow_bits = Bool.(read(h5file2["gamma"]))
-    close(h5file2)
 
     mod1 = GUIModule{Array{Float64,3}}(Figure(),Observable{Array{Float64,3}}(all_data["SmoothSpectra"]),shadow_bits)
     shadow_removal!(mod1)
@@ -77,5 +81,6 @@ function run_gui()
     return nothing
 end
 
-@time run_gui()
+@time load_data()
+# @time run_gui()
 GC.gc()
