@@ -10,14 +10,17 @@ function load_data()
     close(h5file1)
 
     h5file2 = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps.hdf5")
-    all_data = Dict{String,Array{Float64,3}}()
+
+    all_data = Vector{Union{SpecData,MapData}}(undef,length(keys(h5file2)))
     for i ∈ eachindex(keys(h5file2))
         key = keys(h5file2)[i]
         arr = read(h5file2[key])
+
         if ndims(arr) < 3
-            arr = reshape(arr,(size(arr)...,1))
+            all_data[i] = MapData(key,arr,shadow_mask,λ)
+        else
+            all_data[i] = SpecData(key,arr,shadow_mask,λ)
         end
-        all_data[key] = ImageData(key,arr,shadow_mask,λ)
     end
     close(h5file2)
 
