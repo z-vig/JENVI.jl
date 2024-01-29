@@ -8,6 +8,7 @@ export ask_file,
        spectralviewer,
        init_fig,
        init_obs,
+       ImageData,
        GUIModule,
        shadow_removal!,
        band_selector!,
@@ -17,6 +18,8 @@ export ask_file,
 
 include("JenviGUI.jl")
 using .JenviGUI
+
+include("ImageData.jl")
 
 include("GUI_modules/Observables.jl")
 include("GUI_modules/Interactions.jl")

@@ -1,17 +1,6 @@
 using GLMakie
 using StatsBase
 
-mutable struct GUIModule{T}
-    figure::Figure
-    axis::Axis
-    data::Observable{T}
-    shadow_bits::BitMatrix
-end
-
-shadow_removal!(mod::GUIModule{Array{Float64,3}}) = @lift($(mod.data)[(mod.shadow_bits.==1),:] .= NaN)
-
-shadow_removal!(mod::GUIModule{Matrix{Float64}}) = @lift($(mod.data)[(mod.shadow_bits.==1),:] .= NaN)
-
 function band_selector!(mod::GUIModule,location::Tuple{Int,Int})
     #Slider for adjusting the band that is being viewed on a multiple band image
     _fig = mod.figure[location...]

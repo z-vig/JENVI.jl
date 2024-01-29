@@ -2,7 +2,7 @@ using JENVI
 using GLMakie
 using HDF5
 
-function run_gui()
+function load_data()
     h5file = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps.hdf5")
     all_data = Dict{String,Array{Float64,3}}()
     for i ∈ eachindex(keys(h5file))
@@ -14,6 +14,10 @@ function run_gui()
         all_data[key] = arr
     end
     close(h5file)
+end
+
+function run_gui()
+    
 
     specdata = Dict(i=>j for (i,j) in zip(keys(all_data),values(all_data)) if size(j,3)>1)
 
