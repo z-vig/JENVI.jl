@@ -26,9 +26,6 @@ function get_arrays()
     return all_data
 end
 
-
-
-
 function build_gui()
 
     datadict = get_arrays()

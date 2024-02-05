@@ -1,21 +1,28 @@
 using GLMakie
 using StatsBase
+using PolygonOps
+using ColorBrewer
 
 function band_selector!(mod::GUIModule,location::Tuple{Int,Int})
     #Slider for adjusting the band that is being viewed on a multiple band image
-    _fig = mod.figure[location...]
-    _range = @lift(range(1,size($(mod.data),3)))
-    _startvalue = @lift(size($(mod.data),3))
+    _ax = mod.figure[location...]
+    _range = @lift(range(1,size($(mod.data).array,3)))
+    _startvalue = @lift(size($(mod.data).array,3))
 
-    band_slider = Slider(_fig,range=_range,startvalue=_startvalue,tellwidth=false)
+    band_slider = Slider(_ax,range=_range,startvalue=_startvalue,tellwidth=false)
 
     return band_slider.value
 end
 
-function histogram_selector!(mod::GUIModule{Matrix{Float64}},location::Union{Tuple{Int,Int},Axis},histax::Axis)
+function histogram_selector!(mod::GUIModule,slider_loc::Tuple{Int,Int},histax::Axis;band_val::Union{Observable,Nothing} = nothing)
     #Slider for adjusting histogram of reflectance
-    histdata = @lift(vec($(mod.data)[isfinite.($(mod.data))]))
-    _fig = mod.figure[location...]
+    if !isnothing(band_val)
+        histdata = @lift(vec($(mod.data).array[isfinite.($(mod.data).array)[:,:,1],$band_val]))
+    else
+        histdata = @lift(vec($(mod.data).array[isfinite.($(mod.data).array)]))
+    end
+
+    _fig = mod.figure[slider_loc...]
     _range = @lift(range(minimum($histdata),maximum($histdata),100))
     _startvals = @lift((percentile($histdata,1),percentile($histdata,99)))
 
@@ -38,23 +45,119 @@ function histogram_selector!(mod::GUIModule{Matrix{Float64}},location::Union{Tup
                 $(hist_slider.interval)[1] < val < $(hist_slider.interval)[2]
             end)
 
-    return imstretch,bin_edges,bin_colors
+    hist!(histax,histdata,bins=bin_edges,color=bin_colors,colormap=[:transparent,:red],strokewidth=0.1)
+
+    return imstretch
 end
 
-function menu_selector!(mod::GUIModule,location::Tuple{Int,Int},menuoptions::Dict{String,<:Array{Float64}},refaxis::Axis)
+function menu_selector!(mod::GUIModule,location::Tuple{Int,Int},menuoptions::Dict{String,<:AbstractImageData};refaxis=nothing)
     _menu = Menu(mod.figure[location...],
                  options = zip(keys(menuoptions),values(menuoptions)),
                  default = collect(keys(menuoptions))[1],
                  tellheight = false,
+                 tellwidth = false,
                  width = 150)
 
     on(_menu.selection) do sel
         mod.data[] = sel
-        shadow_removal!(mod)
-        reset_limits!(refaxis)
+        if !isnothing(refaxis)
+            reset_limits!(refaxis)
+        end
     end
 
-    return _menu.options,_menu.selection
+    return _menu,_menu.selection
+end
+
+function clear_button!(plots_list::PlotsAccounting,figure::Figure)
+    butt = Button(figure,label="Clear Plot",tellwidth=false,tellheight=false)
+
+    function delete_clear!(plotsobj::PlotsAccounting,fieldname::Symbol)
+        for i in getproperty(plotsobj,fieldname)
+            delete!(i...)
+        end
+        setproperty!(plotsobj,fieldname,[])
+    end
+    
+    on(butt.clicks) do x
+        delete_clear!(plots_list,:pointspec_plots)
+        delete_clear!(plots_list,:image_scatters)
+        delete_clear!(plots_list,:image_polygons)
+        delete_clear!(plots_list,:areaspec_plots)
+        delete_clear!(plots_list,:areastd_plots)
+
+        setproperty!(plots_list,:plot_number,1)
+    end
+
+    return butt
+end
+
+function plot_button!(plots_list::PlotsAccounting,figure::Figure,plotmod_list::Vector{GUIModule},specmod::GUIModule)
+    butt = Button(figure,label="Plot Selection",tellwidth=false,tellheight=false)
+
+    on(butt.clicks) do x
+
+        for mod in plotmod_list
+            rfl_map = poly!(mod.axis,plots_list.area_coordinates,strokewidth=1,color=plots_list.plot_number,colormap=:Set1_9,colorrange=(1,9),alpha=0.5)
+            push!(plots_list.image_polygons,(mod.axis,rfl_map))
+        end
+        for s in plots_list.area_scatters
+            s[2].color = :transparent
+        end
+
+        function run_inpolygon(pt::Vector{Int64})
+            polyg = [[first(i),last(i)] for i in plots_list.area_coordinates]
+            push!(polyg,polyg[1])
+            return inpolygon(pt,polyg)
+        end
+        
+        formatted_coords = hcat([first(i) for i in plots_list.area_coordinates],[last(i) for i in plots_list.area_coordinates])
+        min_x = minimum(formatted_coords[:,1])
+        max_x = maximum(formatted_coords[:,1])
+        min_y = minimum(formatted_coords[:,2])
+        max_y = maximum(formatted_coords[:,2])
+
+        imcoords =  vec([[x,y] for x in 1:size(to_value(plotmod_list[1].data).array,1),y in 1:size(to_value(plotmod_list[1].data).array,2)])
+        imcoords = hcat([i[1] for i in imcoords],[i[2] for i in imcoords])
+
+        formatted_boxdata = []
+        for (x,y) in zip(imcoords[:,1],imcoords[:,2])
+            if x>min_x && x<max_x && y>min_y && y<max_y
+                push!(formatted_boxdata,[x,y])
+            end
+        end
+
+        inside_test = run_inpolygon.(formatted_boxdata)
+
+        selection = [(i[1],i[2]) for i in formatted_boxdata[inside_test.==1]]
+
+        formatted_boxdata = []
+
+        selected_spectra = lift(specmod.data) do x
+            zeros(length(selection),size(x.array,3))
+        end
+
+        @lift(for i in eachindex(selection)
+                if count(isnan.($(specmod.data).array[selection[i]...,:])) == 0
+                    $(selected_spectra)[i,:] = $(specmod.data).array[selection[i]...,:]
+                end
+            end)
+
+        println(count(isnan.(to_value(selected_spectra))))
+        μ = @lift(vec(mean($(selected_spectra),dims=1)))
+        σ = @lift(vec(std($(selected_spectra),dims=1)))
+        println(to_value(μ))
+        al = lines!(specmod.axis,@lift($(specmod.data).λ),μ,color=plots_list.plot_number,colormap=:Set1_9,colorrange=(1,9))
+
+        al_std = band!(specmod.axis,@lift($(specmod.data).λ),@lift($μ.-$σ),@lift($μ.+$σ),color=palette("Set1",9)[plots_list.plot_number],alpha=0.3)
+        
+        push!(plots_list.areaspec_plots,(specmod.axis,al))
+        push!(plots_list.areastd_plots,(specmod.axis,al_std))
+        plots_list.area_coordinates = []
+        plots_list.plot_number +=1
+    end
+
+    return butt
+
 end
 
 function init_obs(figdict::Dict{String,Figure},datadict::Dict{String,Array{Float64,3}},rawλ::Vector{Float64})

@@ -8,21 +8,27 @@ export ask_file,
        spectralviewer,
        init_fig,
        init_obs,
+       AbstractImageData,
        SpecData,
        MapData,
        GUIModule,
+       PlotsAccounting,
        shadow_removal!,
        band_selector!,
        histogram_selector!,
        menu_selector!,
-       activate_spectral_grab
+       clear_button!,
+       plot_button!,
+       activate_pointgrab!,
+       activate_areagrab!
 
 include("JenviGUI.jl")
 using .JenviGUI
 
 include("ImageData.jl")
 
-include("GUI_modules/Observables.jl")
 include("GUI_modules/Interactions.jl")
+include("GUI_modules/Observables.jl")
+
 
 end
