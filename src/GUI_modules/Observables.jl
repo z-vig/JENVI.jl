@@ -142,10 +142,12 @@ function plot_button!(plots_list::PlotsAccounting,figure::Figure,plotmod_list::V
                 end
             end)
 
-        println(count(isnan.(to_value(selected_spectra))))
+        #Getting rid of zeros
+        selected_spectra = @lift(view($selected_spectra,vec(mapslices(col->any(col .!= 0),$selected_spectra,dims=2)),:))
+
         μ = @lift(vec(mean($(selected_spectra),dims=1)))
         σ = @lift(vec(std($(selected_spectra),dims=1)))
-        println(to_value(μ))
+        #println(to_value(selected_spectra))
         al = lines!(specmod.axis,@lift($(specmod.data).λ),μ,color=plots_list.plot_number,colormap=:Set1_9,colorrange=(1,9))
 
         al_std = band!(specmod.axis,@lift($(specmod.data).λ),@lift($μ.-$σ),@lift($μ.+$σ),color=palette("Set1",9)[plots_list.plot_number],alpha=0.3)
