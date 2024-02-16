@@ -14,8 +14,8 @@ struct SpecData <: AbstractImageData
     shadowmask::BitMatrix
     λ::Vector{Float64}
 
-    function applymask(arr::Array{<:AbstractFloat,3},mask::BitMatrix)
-        arr[mask,:] .= NaN
+    function applymask(arr::Array{<:AbstractFloat,3},mask::Matrix{Int64})
+        arr[Bool.(mask),:] .= NaN
         return arr
     end
 
@@ -28,8 +28,8 @@ struct MapData <: AbstractImageData
     shadowmask::BitMatrix
     λ::Vector{Float64}
 
-    function applymask(arr::Matrix{<:AbstractFloat},mask::BitMatrix)
-        arr[mask] .= NaN
+    function applymask(arr::Matrix{<:AbstractFloat},mask::Matrix{Int64})
+        arr[Bool.(mask)] .= NaN
         return arr
     end
 
