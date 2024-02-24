@@ -5,17 +5,20 @@ version = "1.0.0-DEV"
 
 [deps]
 ColorBrewer = "a2cac450-b92f-5266-8821-25eda20663c8"
+ENVI = "cdc236e2-05f6-455d-8b36-4ce943f8ee7a"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 Gtk4 = "9db2cae5-386f-4011-9d63-a5602296539b"
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 PolygonOps = "647866c9-e3ac-4575-94e7-e3d426903924"
+ProgressBars = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-Statistics = "1.9.0"
 GLMakie = "0.9.5"
 Gtk4 = "0.6.0"
 PolygonOps = "0.1.2"
+Statistics = "1.9.0"
 StatsBase = "0.34.2"
 julia = "1"
 

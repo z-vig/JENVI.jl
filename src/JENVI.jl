@@ -13,7 +13,8 @@ export ask_file,
        clear_button!,
        plot_button!,
        activate_pointgrab!,
-       activate_areagrab!
+       activate_areagrab!,
+       initialize_hdf5
 
 include("JenviGUI.jl")
 using .JenviGUI
@@ -22,6 +23,8 @@ include("ImageData.jl")
 
 include("GUI_modules/Interactions.jl")
 include("GUI_modules/Observables.jl")
+
+include("PDSUtils.jl")
 
 function display_h5file(h5path)
     h5file = h5open(h5path)
