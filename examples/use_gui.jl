@@ -2,45 +2,45 @@ using JENVI
 using GLMakie
 using HDF5
 
-function load_data(dataset::HDF5.File;global_data=true,shadow_type="lowmean")
-    if global_data==true
-        λ = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global_wvl/smoooth_wvl.txt"))]
+function load_data(h5file::HDF5.File)
 
-        h5file = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps_global1.hdf5")
-    else
-        λ = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/wvl/smoothed_wvl_data.txt"))]
+    rawλ = read_attribute(h5file,"raw_wavelengths")
+    smoothλ = read_attribute(h5file,"smooth_wavelengths")
 
-        h5file = h5open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/gamma_maps_target.hdf5")
-    end
-
-    shadowmap = read(h5file["ShadowMaps/$shadow_type"])
+    shadowmap = h5file["ShadowMaps/lowsignal_shadows"][:,:]
 
     all_data = Dict{String,AbstractImageData}()
     for key ∈ keys(h5file)
-        for dataset ∈ keys(h5file[key])
-            if key == "ScalarDatasets"
-                all_data[dataset] = MapData(dataset,read(h5file["$key/$dataset"]),shadowmap,λ)
-            elseif key == "VectorDatasets"
-                all_data[dataset] = SpecData(dataset,read(h5file["$key/$dataset"]),shadowmap,λ)
+        if typeof(h5file[key]) == HDF5.Group
+            for dataset ∈ keys(h5file[key])
+                if key == "ScalarDatasets"
+                    println(size(h5file["$key/$dataset"]),dataset)
+                    all_data[dataset] = MapData(dataset,read(h5file["$key/$dataset"]),shadowmap,smoothλ)
+                elseif key == "VectorDatasets"
+                    if dataset == "RawSpectra" || dataset == "RawSpectra_GNDTRU"
+                        all_data[dataset] = SpecData(dataset,read(h5file["$key/$dataset"]),shadowmap,rawλ)
+                    else
+                        all_data[dataset] = SpecData(dataset,read(h5file["$key/$dataset"]),shadowmap,smoothλ)
+                    end
+                end
             end
         end
     end
 
-    all_data["FacetAngle"] = MapData("FacetAngle",h5file["Backplanes/obs"][:,:,10],shadowmap,λ)
-
-    all_data["PhaseAngle"] = MapData("PhaseAngle",h5file["Backplanes/obs"][:,:,5],shadowmap,λ)
+    #([size(h5file["ObservationBackplane"][:,:,i]) for i in 1:size(h5file["ObservationBackplane"],3)])
+    all_data["Observation"] = ObservationData([h5file["ObservationBackplane"][:,:,i] for i in 1:size(h5file["ObservationBackplane"],3)]...,shadowmap)
+    all_data["Location"] = LocationData([h5file["LocationBackplane"][:,:,i] for i in 1:size(h5file["LocationBackplane"],3)]...,shadowmap)
     close(h5file)
 
     return all_data
 end
 
-function run_gui(;global_data=true)
-    @time datadict = load_data(global_data=global_data)
-    specdict = Dict(i[1]=>i[2] for i in datadict if ndims(i[2].array)==3)
-    mapdict::Dict{String,<:AbstractImageData} = Dict(i[1]=>i[2] for i in datadict if ndims(i[2].array)<3)
-    for i in mapdict
-        println(typeof(i[2]))
-    end
+function run_gui(h5filepath)
+    @time datadict = load_data(h5open(h5filepath))
+    specdict::Dict{String,<:AbstractImageData} = Dict(i[1]=>i[2] for i in datadict if typeof(i[2])==SpecData)
+    mapdict::Dict{String,<:AbstractImageData} = Dict(i[1]=>i[2] for i in datadict if typeof(i[2])==MapData)
+    obsobj = datadict["Observation"]
+    locobj = datadict["Location"]
 
     println("Currently Loaded Datasets:")
     for key in collect(keys(datadict))
@@ -49,26 +49,28 @@ function run_gui(;global_data=true)
 
     fig1 = Figure()
     fig2 = Figure()
-    rfl_module = GUIModule(fig1,Axis(fig1[1,1]),Observable(datadict["SmoothSpectra"]))
-    map_module = GUIModule(fig1,Axis(fig1[1,2]),Observable(mapdict[collect(keys(mapdict))[1]]))
+    rfl_module = GUIModule(fig1,Axis(fig1[1,1]),Observable(datadict["SmoothSpectra_GNDTRU"]))
+    map_module = GUIModule(fig1,Axis(fig1[1,2]),Observable(mapdict[collect(keys(mapdict))[2]]))
     spectral_module = GUIModule(fig2,Axis(fig2[1,1],height=350,width=500),Observable(specdict[collect(keys(specdict))[1]]))
     
     band_val = band_selector!(rfl_module,(2,1))
     rfl_imstretch = histogram_selector!(rfl_module,(4,1),Axis(fig1[3,1],height=70),band_val=band_val)
+
     map_imstretch = histogram_selector!(map_module,(4,2),Axis(fig1[3,2],height=70))
     menu_obj,menu_selection = menu_selector!(map_module,(2,2),mapdict,refaxis=map_module.axis)
     spec_menu_obj,spec_menu_selection = menu_selector!(spectral_module,(1,2),specdict,refaxis=spectral_module.axis)
 
-    plots_list = PlotsAccounting(1,[],[],[],[],[],[],[])
+    plots_list = PlotsAccounting()
 
     clearbutton_obj = clear_button!(plots_list,fig2)
     plotbutton_obj = plot_button!(plots_list,fig2,[rfl_module,map_module],spectral_module)
+    savebutton_obj = save_button!(plots_list,fig2,"C:/Users/zvig/.julia/dev/JENVI.jl/Data/SavedGUIData")
 
     fig2[2,1] = buttongrid = GridLayout(tellwidth=false,height=50)
-    buttongrid[1,1:2] = [clearbutton_obj,plotbutton_obj]
+    buttongrid[1,1:3] = [clearbutton_obj,plotbutton_obj,savebutton_obj]
 
-    activate_pointgrab!(plots_list,rfl_module,spectral_module,:spectral_grab1,[map_module.axis])
-    activate_pointgrab!(plots_list,map_module,spectral_module,:spectral_grab2,[rfl_module.axis])
+    activate_pointgrab!(plots_list,rfl_module,spectral_module,:spectral_grab1,[map_module.axis],locobj,obsobj)
+    activate_pointgrab!(plots_list,map_module,spectral_module,:spectral_grab2,[rfl_module.axis],locobj,obsobj)
     activate_areagrab!(plots_list,rfl_module,:area_grab1,[map_module.axis])
     activate_areagrab!(plots_list,map_module,:area_grab2,[rfl_module.axis])
 
@@ -83,5 +85,7 @@ function run_gui(;global_data=true)
 end
 
 #@time run_gui(global_data=true)
-@time run_gui(global_data=false)
+@time run_gui("C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5")
+# @time run_gui("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5")
+# @time run_gui("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5")
 GC.gc()

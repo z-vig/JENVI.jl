@@ -2,7 +2,7 @@ using GLMakie
 using StatsBase
 using PolygonOps
 
-function activate_pointgrab!(plot_list::PlotsAccounting,im_mod::GUIModule,spec_mod::GUIModule,interaction_name::Symbol,linked_axes::Vector{Axis})
+function activate_pointgrab!(plot_list::PlotsAccounting,im_mod::GUIModule,spec_mod::GUIModule,interaction_name::Symbol,linked_axes::Vector{Axis},locobj::LocationData,obsobj::ObservationData)
 
     register_interaction!(im_mod.axis,interaction_name) do event::MouseEvent,axis
         if event.type==MouseEventTypes.leftclick
@@ -28,7 +28,7 @@ function activate_pointgrab!(plot_list::PlotsAccounting,im_mod::GUIModule,spec_m
                 push!(plot_list.image_scatters,(axis,ps_link))
             end
 
-            println("X:$xpos, Y:$ypos, $(plot_list.plot_number)")
+            println("Plot Number: $(plot_list.plot_number)\nLocation: Lat{$(locobj.lat[xpos,ypos])}, Long{$(locobj.long[xpos,ypos])}\nObservation: Phase{$(obsobj.phase[xpos,ypos])}, FacetAngle{$(obsobj.facet_angle[xpos,ypos])}")
         end
     end
 end

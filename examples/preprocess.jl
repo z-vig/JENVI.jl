@@ -53,14 +53,25 @@ In general, the file structure for the hdf5 dataset is:
 function preprocess(gnd_tru_path::String,h5filepath::String,dataset_type::String)
 
     h5open(h5filepath,"r+") do h5file
-        println("Applying Ground Truth Correction...")
-        @time apply_gnd_tru(gnd_tru_path,h5file,dataset_type)
+        # println("Applying Ground Truth Correction...")
+        # @time apply_gnd_tru(gnd_tru_path,h5file,dataset_type)
 
-        println("Smoothing Spectral Domain...")
-        @time movingavg(h5file,9)
+        # println("Smoothing Spectral Domain...")
+        # @time movingavg(h5file,9)
 
-        println("Removing 2-point continuum...")
-        @time doubleLine_removal(h5file)
+        # println("Removing 2-point continuum...")
+        # @time doubleLine_removal(h5file)
+
+        println("Finding Shadows...")
+
+        try
+            create_group(h5file,"ShadowMaps")
+        catch _
+            println("Group already exists...")
+        end
+
+        @time facet_shadowmap(h5file)
+        @time lowsignal_shadowmap(h5file)
     end
 
     h5open(h5filepath,"r") do h5file
@@ -83,6 +94,8 @@ function spectral_parameters(h5filepath::String)
         i2_max = i2_min + 40*21
         @time IBD_map(h5file,i2_min,i2_max)
 
+        h5file["ScalarDatasets/band_ratio"] = h5file["ScalarDatasets/IBD_789_1309"][:,:]./h5file["ScalarDatasets/IBD_1658_2498"][:,:]
+
         println("Making 1μm Band Center Map...")
         λ_range = (650.,1350.)
         @time bandcenter_map(h5file,λ_range,fit_type="Spline")
@@ -102,13 +115,13 @@ function spectral_parameters(h5filepath::String)
     return nothing
 end
 
-#@time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3target_L1B/grnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5","targeted")
-#@time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5")
+# @time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3target_L1B/grnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5","targeted")
+@time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5")
 
 # @time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3global_L1B/gnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5","global")
-# @time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5")
+@time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5")
 
-@time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3global_L1B/gnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5","global")
+# @time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3global_L1B/gnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5","global")
 @time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5")
 
 GC.gc()

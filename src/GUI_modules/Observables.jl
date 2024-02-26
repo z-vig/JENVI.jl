@@ -2,6 +2,7 @@ using GLMakie
 using StatsBase
 using PolygonOps
 using ColorBrewer
+using Dates
 
 function band_selector!(mod::GUIModule,location::Tuple{Int,Int})
     #Slider for adjusting the band that is being viewed on a multiple band image
@@ -34,6 +35,7 @@ function histogram_selector!(mod::GUIModule,slider_loc::Tuple{Int,Int},histax::A
     end
 
     bin_width = @lift(2*iqr($histdata)/(length($histdata))^(1/3))
+    println(nquantile(to_value(histdata),4)," ",length(to_value(histdata)))
     bin_edges = @lift(minimum($histdata):$bin_width:maximum($histdata))
     bin_avg = @lift([($bin_edges[i]+$bin_edges[i+1])/2 for i ∈ eachindex($bin_edges[1:end-1])])
 
@@ -56,7 +58,7 @@ function menu_selector!(mod::GUIModule,location::Tuple{Int,Int},menuoptions::Dic
                  default = collect(keys(menuoptions))[1],
                  tellheight = false,
                  tellwidth = false,
-                 width = 150)
+                 width = 400)
 
     on(_menu.selection) do sel
         mod.data[] = sel
@@ -84,6 +86,7 @@ function clear_button!(plots_list::PlotsAccounting,figure::Figure)
         delete_clear!(plots_list,:image_polygons)
         delete_clear!(plots_list,:areaspec_plots)
         delete_clear!(plots_list,:areastd_plots)
+        delete_clear!(plots_list,:plotted_data)
 
         setproperty!(plots_list,:plot_number,1)
     end
@@ -100,6 +103,7 @@ function plot_button!(plots_list::PlotsAccounting,figure::Figure,plotmod_list::V
             rfl_map = poly!(mod.axis,plots_list.area_coordinates,strokewidth=1,color=plots_list.plot_number,colormap=:Set1_9,colorrange=(1,9),alpha=0.5)
             push!(plots_list.image_polygons,(mod.axis,rfl_map))
         end
+
         for s in plots_list.area_scatters
             s[2].color = :transparent
         end
@@ -149,13 +153,32 @@ function plot_button!(plots_list::PlotsAccounting,figure::Figure,plotmod_list::V
         σ = @lift(vec(std($(selected_spectra),dims=1)))
         #println(to_value(selected_spectra))
         al = lines!(specmod.axis,@lift($(specmod.data).λ),μ,color=plots_list.plot_number,colormap=:Set1_9,colorrange=(1,9))
-
         al_std = band!(specmod.axis,@lift($(specmod.data).λ),@lift($μ.-$σ),@lift($μ.+$σ),color=palette("Set1",9)[plots_list.plot_number],alpha=0.3)
         
+        push!(plots_list.plotted_data,to_value(μ))
         push!(plots_list.areaspec_plots,(specmod.axis,al))
         push!(plots_list.areastd_plots,(specmod.axis,al_std))
         plots_list.area_coordinates = []
         plots_list.plot_number +=1
+    end
+
+    return butt
+
+end
+
+function save_button!(plots_list::PlotsAccounting,figure::Figure,savefolder::String)
+    butt = Button(figure,label="Save Spectra",tellwidth=false,tellheight=false)
+
+    on(butt.clicks) do x
+        nowstr = string(now())
+        nowstr = nowstr[1:end-4]|>x->replace(x,"-"=>"")|>x->replace(x,":"=>"")
+        open("$savefolder/save_$(nowstr).txt","w") do f
+            for i in plots_list.plotted_data
+                strlist = ["$i," for i in string.(i)]
+                strlist[end] = replace(strlist[end],","=>"\n")
+                write(f,strlist...)
+            end
+        end
     end
 
     return butt

@@ -6,6 +6,7 @@ version = "1.0.0-DEV"
 [deps]
 BSplineKit = "093aae92-e908-43d7-9660-e50ee39d5a0a"
 ColorBrewer = "a2cac450-b92f-5266-8821-25eda20663c8"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 ENVI = "cdc236e2-05f6-455d-8b36-4ce943f8ee7a"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 Gtk4 = "9db2cae5-386f-4011-9d63-a5602296539b"

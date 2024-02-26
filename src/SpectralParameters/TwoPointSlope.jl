@@ -20,7 +20,7 @@ function slope_map(dataset::HDF5.File,λmin::Float64,λmax::Float64)
     slope_map[:,:,1] .= (image[:,:,max_index] .- image[:,:,min_index]) ./ (max_index-min_index)
 
     try
-        delete_object(dataset,"ScalarDatasets/slope_map_$(round(Int,λmin))_$(round(Int,λmax))")
+        delete_object(dataset,"ScalarDatasets/slopemap_$(round(Int,λmin))_$(round(Int,λmax))")
     catch _
         println("Creating new slope map dataset...")
     end

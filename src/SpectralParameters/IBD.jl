@@ -29,7 +29,7 @@ function IBD_map(dataset::HDF5.File,λ₁::Real,λ₂::Real)
         println("Creating new IBD dataset...")
     end
 
-    dataset["ScalarDatasets/IBD_$(round(Int,λ₁))_$(round(Int,λ₂))"] = IBDmap
+    dataset["ScalarDatasets/IBD_$(round(Int,λ₁))_$(round(Int,λ₂))"] = IBDmap[:,:,1]
 
     return IBDmap
 
