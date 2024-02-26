@@ -2,7 +2,7 @@ using JENVI
 using GLMakie
 using HDF5
 
-function load_data(;global_data=true,shadow_type="lowmean")
+function load_data(dataset::HDF5.File;global_data=true,shadow_type="lowmean")
     if global_data==true
         λ = [parse(Float64,i) for i in readlines(open("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global_wvl/smoooth_wvl.txt"))]
 

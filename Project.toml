@@ -4,12 +4,16 @@ authors = ["Z.M. Vig <zvig@umd.edu> and contributors"]
 version = "1.0.0-DEV"
 
 [deps]
+BSplineKit = "093aae92-e908-43d7-9660-e50ee39d5a0a"
 ColorBrewer = "a2cac450-b92f-5266-8821-25eda20663c8"
 ENVI = "cdc236e2-05f6-455d-8b36-4ce943f8ee7a"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 Gtk4 = "9db2cae5-386f-4011-9d63-a5602296539b"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+LazySets = "b4f0291d-fe17-52bc-9479-3d1a343d9043"
 PolygonOps = "647866c9-e3ac-4575-94e7-e3d426903924"
+Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 ProgressBars = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
