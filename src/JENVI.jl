@@ -15,8 +15,11 @@ export ask_file,
        clear_button!,
        plot_button!,
        save_button!,
+       print_button!,
        activate_pointgrab!,
        activate_areagrab!,
+       activate_areaprint!,
+       save_myfig,
        initialize_hdf5,
        combine_hdf5,
        apply_gnd_tru,
@@ -38,6 +41,7 @@ include("ImageData.jl")
 
 include("GUI_modules/Interactions.jl")
 include("GUI_modules/Observables.jl")
+include("GUI_modules/SaveConfig.jl")
 
 include("PDSUtils.jl")
 

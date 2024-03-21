@@ -3,6 +3,7 @@ using StatsBase
 using PolygonOps
 using ColorBrewer
 using Dates
+using JENVI
 
 function band_selector!(mod::GUIModule,location::Tuple{Int,Int})
     #Slider for adjusting the band that is being viewed on a multiple band image
@@ -58,7 +59,7 @@ function menu_selector!(mod::GUIModule,location::Tuple{Int,Int},menuoptions::Dic
                  default = collect(keys(menuoptions))[1],
                  tellheight = false,
                  tellwidth = false,
-                 width = 400)
+                 width = 260)
 
     on(_menu.selection) do sel
         mod.data[] = sel
@@ -179,8 +180,101 @@ function save_button!(plots_list::PlotsAccounting,figure::Figure,savefolder::Str
                 write(f,strlist...)
             end
         end
+        
+        #save_myfig(figure,"G:/Shared drives/Zach Lunar-VISE/Research Presentations/LPSC24/current_gui.svg")
+
     end
 
     return butt
 
+end
+
+function print_button!(plots_list::PlotsAccounting,figure::Figure,plotmod_list::Vector{GUIModule{ObservationData}},specmod::GUIModule)
+    butt = Button(figure,label="Print Selection",tellwidth=false,tellheight=false)
+
+    on(butt.clicks) do x
+
+        for mod in plotmod_list
+            rfl_map = poly!(mod.axis,plots_list.area_coordinates,strokewidth=1,color=plots_list.plot_number,colormap=:Set1_9,colorrange=(1,9),alpha=0.5)
+            push!(plots_list.image_polygons,(mod.axis,rfl_map))
+        end
+
+        for s in plots_list.area_scatters
+            s[2].color = :transparent
+        end
+
+        function run_inpolygon(pt::Vector{Int64})
+            polyg = [[first(i),last(i)] for i in plots_list.area_coordinates]
+            push!(polyg,polyg[1])
+            return inpolygon(pt,polyg)
+        end
+        
+        formatted_coords = hcat([first(i) for i in plots_list.area_coordinates],[last(i) for i in plots_list.area_coordinates])
+        min_x = minimum(formatted_coords[:,1])
+        max_x = maximum(formatted_coords[:,1])
+        min_y = minimum(formatted_coords[:,2])
+        max_y = maximum(formatted_coords[:,2])
+
+        imcoords = vec([[x,y] for x in 1:size(to_value(plotmod_list[1].data).facet_angle,1),y in 1:size(to_value(plotmod_list[1].data).facet_angle,2)])
+        imcoords = hcat([i[1] for i in imcoords],[i[2] for i in imcoords])
+
+        formatted_boxdata = []
+        for (x,y) in zip(imcoords[:,1],imcoords[:,2])
+            if x>min_x && x<max_x && y>min_y && y<max_y
+                push!(formatted_boxdata,[x,y])
+            end
+        end
+
+        inside_test = run_inpolygon.(formatted_boxdata)
+
+        selection = [(i[1],i[2]) for i in formatted_boxdata[inside_test.==1]]
+
+        formatted_boxdata = []
+
+        println(typeof(plotmod_list[1]))
+        fct_ang = []
+        phs_ang = []
+        incid = []
+        emiss = []
+        m3_az = []
+        sun_azi = []
+
+        @lift(for i in eachindex(selection)
+            push!(fct_ang,$(plotmod_list[1].data).facet_angle[selection[i]...])
+            push!(phs_ang,$(plotmod_list[1].data).phase[selection[i]...])
+            push!(incid,$(plotmod_list[1].data).sun_zen[selection[i]...])
+            push!(emiss,$(plotmod_list[1].data).m3_zen[selection[i]...])
+            push!(m3_az,$(plotmod_list[1].data).m3_azi[selection[i]...])
+            push!(sun_azi,$(plotmod_list[1].data).sun_azi[selection[i]...])
+        end)
+        
+        μ_fct = mean(fct_ang)
+        σ_fct = std(fct_ang)
+
+        μ_phs = mean(phs_ang)
+        σ_phs = std(phs_ang)
+
+        μ_incid = mean(incid)
+        σ_incid = std(incid)
+
+        μ_emiss = mean(emiss)
+        σ_emiss = std(emiss)
+
+        μ_m3az = mean(m3_az)
+        σ_m3az = std(m3_az)
+
+        μ_sunazi = mean(sun_azi)
+        σ_sunazi = std(sun_azi)
+
+        println("Facet Angle: $(μ_fct) ± $(σ_fct)")
+        println("Phase Angle: $(μ_phs) ± $(σ_phs)")
+        println("Incidence Angle: $(μ_incid) ± $(σ_incid)")
+        println("Emmision Angle: $(μ_emiss) ± $(σ_emiss)")
+        println("M3 Azimuth: $(μ_m3az) ± $(σ_m3az)")
+        println("Sun Azimuth: $(μ_sunazi) ± $(σ_sunazi)")
+
+    end
+
+    return butt
+        
 end

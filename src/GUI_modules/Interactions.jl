@@ -59,3 +59,23 @@ function activate_areagrab!(plots_list::PlotsAccounting,im_mod::GUIModule,intera
         end
     end
 end
+
+function activate_areaprint!(plots_list::PlotsAccounting,im_mod::GUIModule,interaction_name::Symbol)
+
+    register_interaction!(im_mod.axis,interaction_name) do event::KeysEvent, axis
+        if all([i in event.keys for i in [Keyboard.q,Keyboard.left_shift]])
+            mp = mouseposition(im_mod.axis)
+            xpos = Int(round(mp[1]))
+            ypos = Int(round(mp[2]))
+
+            xsize = @lift(size($(im_mod.data).facet_angle,1))
+            ysize = @lift(size($(im_mod.data).facet_angle,2))
+
+            if 0<xpos<to_value(xsize) && 0<ypos<to_value(ysize)
+                srfl = scatter!(im_mod.axis,xpos,ypos,color=:Red)
+                push!(plots_list.area_scatters,(im_mod.axis,srfl))
+                push!(plots_list.area_coordinates,(xpos,ypos))
+            end
+        end
+    end
+end
