@@ -61,6 +61,6 @@ end
 d_dome_material = cat(d3[1],d4[2],d2[:]...,dims=2)
 d_offdome_material = cat(d1[:]...,d4[1],dims=2)
 
-save_this(d_dome_material,"dome_materials")
-save_this(d_offdome_material,"offdome")
-save_this(d5,"olivine")
+# save_this(d_dome_material,"dome_materials")
+# save_this(d_offdome_material,"offdome")
+# save_this(d5,"olivine")
