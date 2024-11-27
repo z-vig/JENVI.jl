@@ -1,14 +1,9 @@
-using Statistics
 using HDF5
+using Statistics
 
-"""
-    movingavg(dataset::HDF5.File,box_size::Int)
-
-TBW
-"""
-function movingavg(dataset::HDF5.File,box_size::Int; fill_ends::Bool=false)
-    input_image = dataset["VectorDatasets/Reflectance_GNDTRU"][:,:,:]
-    input_λvector = read_attribute(dataset,"raw_wavelengths")
+function movingavg(dataset::HDF5.File,box_size::Int)
+    input_image = dataset["VectorDatasets/Radiance_uncalib"][:,:,:]
+    input_λvector = read_attribute(dataset,"rdn_wavelengths")
 
     if box_size%2==0
         throw(DomainError(box_size,"Box Size must be odd!"))
@@ -37,29 +32,27 @@ function movingavg(dataset::HDF5.File,box_size::Int; fill_ends::Bool=false)
         #println("$(avg_im[20,20,band])...$band")
     end
 
-    if fill_ends == false
-        avg_λvector = input_λvector[split_index+1:size(input_image)[3]-split_index]
-    elseif fill_ends == true
-        avg_λvector = input_λvector
-        avg_im = cat(input_image[:,:,1:4],avg_im,input_image[:,:,end-3:end],dims=3)
-    end
-    
+    avg_λvector = input_λvector[split_index+1:size(input_image)[3]-split_index]
 
     try
-        delete_object(dataset,"VectorDatasets/Reflectance_GNDTRU_Smooth")
+        delete_object(dataset,"VectorDatasets/Radiance_uncalib_smooth")
     catch e
         println("Creating new smooth spectra dataset...")
     end
     
-    dataset["VectorDatasets/Reflectance_GNDTRU_Smooth"] = avg_im
+    dataset["VectorDatasets/Radiance_uncalib_smooth"] = avg_im
 
     try
-        write_attribute(dataset,"smooth_wavelengths",avg_λvector)
+        write_attribute(dataset,"smooth_rdn_wavelengths",avg_λvector)
     catch
-        delete_attribute(dataset,"smooth_wavelengths")
-        write_attribute(dataset,"smooth_wavelengths",avg_λvector)
+        delete_attribute(dataset,"smooth_rdn_wavelengths")
+        write_attribute(dataset,"smooth_rdn_wavelengths",avg_λvector)
     end
 
-    return avg_im,avg_λvector
     println("Size of Image: $(size(input_image))")
+    return avg_im,avg_λvector
 end
+
+h5file = h5open("C:/Users/zvig/.julia/dev/M3_matched_filtering/Data/targeted.hdf5","r+")
+@time movingavg(h5file,9)
+close(h5file)

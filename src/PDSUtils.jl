@@ -96,7 +96,7 @@ function setup_h5(dataset_savepath::String)
     end 
 end
 
-function grab_targetedλ(rdn_hdr_path::String,h5saveobj::HDF5.File)
+function grab_targetedλ(rdn_hdr_path::String)
     s = open(rdn_hdr_path) do f
         return readlines(f)
     end
@@ -106,15 +106,6 @@ function grab_targetedλ(rdn_hdr_path::String,h5saveobj::HDF5.File)
     s = s .|> x->replace(x," "=>"") .|> x->replace(x,","=>"") .|> x->replace(x,"}"=>"") .|> x->parse(Float64,x)
     #Getting rid of bad bands
     s = s[9:end-1]
-
-    try
-        println("Attr Try")
-        write_attribute(h5saveobj,"raw_wavelengths",s)
-    catch e
-        println("Attr Catch")
-        delete_attribute(h5saveobj,"raw_wavelengths")
-        write_attribute(h5saveobj,"raw_wavelengths",s)
-    end
 
     return s
 end

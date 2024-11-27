@@ -7,7 +7,7 @@ using HDF5
 """
 
 function apply_gnd_tru(gndtru_path::String,dataset::HDF5.File,dataset_type::String)
-    rfl_arr = dataset["VectorDatasets/RawSpectra"][:,:,:]
+    rfl_arr = dataset["VectorDatasets/Reflectance"][:,:,:]
     gndtru_vals = open(gndtru_path) do f
         s = readlines(f)
         s = s .|> x->split(x,"  ") |> x->deleteat!(x,x.=="") |> x->parse.(Float64,x)
@@ -24,12 +24,12 @@ function apply_gnd_tru(gndtru_path::String,dataset::HDF5.File,dataset_type::Stri
     rfl_arr_gndtru = mapslices(x -> x.*gndtru_vals, rfl_arr, dims=3)
 
     try
-        delete_object(dataset,"VectorDatasets/RawSpectra_GNDTRU")
+        delete_object(dataset,"VectorDatasets/Reflectance_GNDTRU")
     catch _
         println("Creating new ground truth corrected dataset...")
     end
 
-    dataset["VectorDatasets/RawSpectra_GNDTRU"] = rfl_arr_gndtru
+    dataset["VectorDatasets/Reflectance_GNDTRU"] = rfl_arr_gndtru
 
     return rfl_arr_gndtru
 end

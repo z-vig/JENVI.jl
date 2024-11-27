@@ -28,8 +28,8 @@ function load_data(h5file::HDF5.File)
     end
 
     #([size(h5file["ObservationBackplane"][:,:,i]) for i in 1:size(h5file["ObservationBackplane"],3)])
-    all_data["Observation"] = ObservationData([h5file["ObservationBackplane"][:,:,i] for i in 1:size(h5file["ObservationBackplane"],3)]...,shadowmap)
-    all_data["Location"] = LocationData([h5file["LocationBackplane"][:,:,i] for i in 1:size(h5file["LocationBackplane"],3)]...,shadowmap)
+    all_data["Observation"] = ObservationData([h5file["Backplanes/ObsGeometry"][:,:,i] for i in 1:size(h5file["Backplanes/ObsGeometry"],3)]...,shadowmap)
+    all_data["Location"] = LocationData([h5file["Backplanes/LatLongElev"][:,:,i] for i in 1:size(h5file["Backplanes/LatLongElev"],3)]...,shadowmap)
     close(h5file)
 
     return all_data

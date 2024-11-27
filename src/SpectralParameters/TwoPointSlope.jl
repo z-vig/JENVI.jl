@@ -7,9 +7,9 @@ using JENVI
 
 TBW
 """
-function slope_map(dataset::HDF5.File,λmin::Float64,λmax::Float64)
+function slope_map(dataset::HDF5.File,datapath::String,λmin::Float64,λmax::Float64)
 
-    image = dataset["VectorDatasets/SmoothSpectra_GNDTRU"]
+    image = dataset[datapath]
     λ = read_attribute(dataset,"smooth_wavelengths")
     
     min_index = findλ(λ,λmin)[1]
@@ -20,12 +20,12 @@ function slope_map(dataset::HDF5.File,λmin::Float64,λmax::Float64)
     slope_map[:,:,1] .= (image[:,:,max_index] .- image[:,:,min_index]) ./ (max_index-min_index)
 
     try
-        delete_object(dataset,"ScalarDatasets/slopemap_$(round(Int,λmin))_$(round(Int,λmax))")
+        delete_object(dataset,"ScalarDatasets/$(basename(datapath))_slopemap_$(round(Int,λmin))_$(round(Int,λmax))")
     catch _
         println("Creating new slope map dataset...")
     end
 
-    dataset["ScalarDatasets/slopemap_$(round(Int,λmin))_$(round(Int,λmax))"] = slope_map[:,:,1]
+    dataset["ScalarDatasets/$(basename(datapath))_slopemap_$(round(Int,λmin))_$(round(Int,λmax))"] = slope_map[:,:,1]
 
     return slope_map
 end

@@ -53,30 +53,30 @@ In general, the file structure for the hdf5 dataset is:
 function preprocess(gnd_tru_path::String,h5filepath::String,dataset_type::String)
 
     h5open(h5filepath,"r+") do h5file
-        # println("Applying Ground Truth Correction...")
-        # @time apply_gnd_tru(gnd_tru_path,h5file,dataset_type)
+        println("Applying Ground Truth Correction...")
+        @time apply_gnd_tru(gnd_tru_path,h5file,dataset_type)
 
-        # println("Smoothing Spectral Domain...")
-        # @time movingavg(h5file,9)
+        println("Smoothing Spectral Domain...")
+        @time movingavg(h5file,9,fill_ends=true)
 
-        # println("Removing 2-point continuum...")
-        # @time doubleLine_removal(h5file)
+        println("Removing 2-point continuum...")
+        @time doubleLine_removal(h5file)
 
-        println("Finding Shadows...")
+    #     println("Finding Shadows...")
 
-        try
-            create_group(h5file,"ShadowMaps")
-        catch _
-            println("Group already exists...")
-        end
+    #     try
+    #         create_group(h5file,"ShadowMaps")
+    #     catch _
+    #         println("Group already exists...")
+    #     end
 
-        @time facet_shadowmap(h5file)
-        @time lowsignal_shadowmap(h5file)
+    #     @time facet_shadowmap(h5file)
+    #     @time lowsignal_shadowmap(h5file)
     end
 
-    h5open(h5filepath,"r") do h5file
-        display_h5file(h5file)
-    end
+    # h5open(h5filepath,"r") do h5file
+    #     display_h5file(h5file)
+    # end
 
     return nothing
 end
@@ -84,6 +84,7 @@ end
 function spectral_parameters(h5filepath::String)
 
     h5open(h5filepath,"r+") do h5file
+
         println("Making IBD1000 map...")
         i1_min = 789
         i1_max = i1_min + 20*26
@@ -115,14 +116,14 @@ function spectral_parameters(h5filepath::String)
     return nothing
 end
 
-# @time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3target_L1B/grnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5","targeted")
-@time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/targeted.hdf5")
+@time preprocess("C:/Lunar_Imagery_Data/M3_data/pds_data/L2_Data/L2_target/calib/M3T20111117_RFL_GRND_TRU_1.TAB","C:/Lunar_Imagery_Data/M3_data/hdf5_files/target_corrected.hdf5","targeted")
+@time spectral_parameters("C:/Lunar_Imagery_Data/M3_data/hdf5_files/target_corrected.hdf5")
 
 # @time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3global_L1B/gnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5","global")
-@time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5")
+# @time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global1.hdf5")
 
 # @time preprocess("C:/Lunar_Imagery_Data/gruithuisen_m3global_L1B/gnd_tru1.tab","C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5","global")
-@time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5")
+# @time spectral_parameters("C:/Users/zvig/.julia/dev/JENVI.jl/Data/global2.hdf5")
 
 GC.gc()
 

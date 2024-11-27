@@ -7,7 +7,6 @@ using GLMakie
 
 abstract type AbstractImageData end
 
-
 struct SpecData <: AbstractImageData
     name::String
     array::Array{Float64,3}

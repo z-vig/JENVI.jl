@@ -14,7 +14,7 @@ function doubleLine_removal(dataset::HDF5.File)
     Finally, with these endpoints, the final continuum is calculated from the rfl values at these points on the original spectrum
     """
     
-    image = dataset["VectorDatasets/SmoothSpectra_GNDTRU"][:,:,:]
+    image = dataset["VectorDatasets/Reflectance_GNDTRU_Smooth"][:,:,:]
     λ = read_attribute(dataset,"smooth_wavelengths")
 
     #Getting initial continuum line
@@ -38,13 +38,13 @@ function doubleLine_removal(dataset::HDF5.File)
 
     cont1_rem = image./cont1_complete
 
-    range1 = (650,1000)
-    range2 = (1350,1600)
-    range3 = (2000,2600)
+    RANGE1 = (650,1000)
+    RANGE2 = (1350,1600)
+    RANGE3 = (2000,2600)
 
     cont2_band_indices = zeros(Int,size(image,1),size(image,2),3)
     n = 1
-    for (i,j) ∈ [range1,range2,range3]
+    for (i,j) ∈ [RANGE1,RANGE2,RANGE3]
         min_index = findλ(λ,i)[1]
         max_index = findλ(λ,j)[1]
         cont2_band_indices[:,:,n] .= getindex.(argmax(cont1_rem[:,:,range(min_index,max_index)],dims=3),3).+(min_index-1)
@@ -76,19 +76,19 @@ function doubleLine_removal(dataset::HDF5.File)
     cont2_rem = image./cont2_complete
 
     try
-        delete_object(dataset,"VectorDatasets/2pContRem_Smooth_GNDTRU")
+        delete_object(dataset,"VectorDatasets/ContinuumRemoved")
     catch _
         println("Creating new continuum removed, smoothed and ground-truthed dataset...")
     end
 
     try
-        delete_object(dataset,"VectorDatasets/2pContinuum")
+        delete_object(dataset,"VectorDatasets/ContinuumValues")
     catch _
         println("Creating new continuum dataset...")
     end
 
-    dataset["VectorDatasets/2pContRem_Smooth_GNDTRU"] = cont2_rem
-    dataset["VectorDatasets/2pContinuum"] = cont2_complete
+    dataset["VectorDatasets/ContinuumRemoved"] = cont2_rem
+    dataset["VectorDatasets/ContinuumValues"] = cont2_complete
     
     return cont1_band_indices,cont1_rem,cont1_complete,cont2_band_indices,cont2_wvls,cont2_complete,cont2_rem
 

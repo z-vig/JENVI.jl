@@ -14,7 +14,7 @@ end
 
 function bandcenter_map(dataset::HDF5.File,λrange::Tuple{Float64,Float64} ; fit_type="Spline",degree=4)
 
-    image = dataset["VectorDatasets/2pContRem_Smooth_GNDTRU"]
+    image = dataset["VectorDatasets/ContinuumRemoved"]
     λ = read_attribute(dataset,"smooth_wavelengths")
     
     minλ_ind = findλ(λ,λrange[1])[1]

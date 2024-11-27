@@ -7,7 +7,7 @@ using Statistics
 TBW
 """
 function facet_shadowmap(dataset::HDF5.File)
-    obs = dataset["ObservationBackplane"]
+    incidence_angle = dataset["Backplanes/TerrainGeometry"]
 
     try
         delete_object(dataset,"ShadowMaps/facet_shadows")
@@ -15,8 +15,8 @@ function facet_shadowmap(dataset::HDF5.File)
         println("Creating new facet shadow dataset...")
     end
 
-    shmap = Int64.((180/pi)*acos.(obs[:,:,10]) .> 80)
-    println(typeof(shmap))
+    shmap = Int64.(incidence_angle .> 80)
+
     dataset["ShadowMaps/facet_shadows"] = shmap
     return nothing
 end
@@ -27,7 +27,7 @@ end
 TBW
 """
 function lowsignal_shadowmap(dataset::HDF5.File)
-    rawspec = dataset["VectorDatasets/RawSpectra"][:,:,:]
+    rawspec = dataset["VectorDatasets/Reflectance"][:,:,:]
 
     try
         delete_object(dataset,"ShadowMaps/lowsignal_shadows")

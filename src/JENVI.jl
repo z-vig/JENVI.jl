@@ -1,6 +1,9 @@
 module JENVI
 
-export ask_file,
+export JLGui,
+       config_vis_window!,
+       create_hdf5_tree!,
+       add_image_data!,
        AbstractImageData,
        SpecData,
        MapData,
@@ -33,7 +36,6 @@ export ask_file,
        display_h5file,
        findλ
 
-
 include("JenviGUI.jl")
 using .JenviGUI
 
@@ -44,6 +46,8 @@ include("GUI_modules/Observables.jl")
 include("GUI_modules/SaveConfig.jl")
 
 include("PDSUtils.jl")
+export grab_globalλ,
+       grab_targetedλ
 
 include("Preprocessing/GroundTruthCorrection.jl")
 include("Preprocessing/SpectralSmoothing.jl")
@@ -53,6 +57,8 @@ include("Preprocessing/ShadowMap.jl")
 include("SpectralParameters/IBD.jl")
 include("SpectralParameters/BandCenter.jl")
 include("SpectralParameters/TwoPointSlope.jl")
+
+
 
 function display_h5file(h5file::HDF5.File)
     for i in keys(h5file)

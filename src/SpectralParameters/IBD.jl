@@ -10,8 +10,8 @@ TBW
 
 function IBD_map(dataset::HDF5.File,λ₁::Real,λ₂::Real)
 
-    image = dataset["VectorDatasets/RawSpectra"][:,:,:]
-    continuum = dataset["VectorDatasets/2pContinuum"][:,:,:]
+    image = dataset["VectorDatasets/Reflectance_GNDTRU"][:,:,:]
+    continuum = dataset["VectorDatasets/ContinuumValues"][:,:,:]
     λvec = read_attribute(dataset,"smooth_wavelengths")
 
     min_λindex = findλ(λvec,λ₁)[1]
