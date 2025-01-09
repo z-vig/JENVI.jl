@@ -1,12 +1,12 @@
-rangeof(x) = (tmp = extrema(x); return tmp[2] - tmp[1])
+rangeof(x) = (tmp = extrema(x); return tmp[2] - tmp[1]) #Finds the statistical range of a dataset, x
 
 """
     image_visualizer()
 
 #Arguments
-- `h5loc` 
+- `h5loc::H5FileLocation`
 """
-function image_visualizer(h5loc::HDF5FileLocation; band=nothing, band_names=nothing, colormap = :gray1, bands_first = false, flip_image=false, ax_name="",mark_badvals::Bool=false)
+function image_visualizer(h5loc::T; band=nothing, band_names=nothing, colormap = :gray1, bands_first = false, flip_image=false, ax_name="",mark_badvals::Bool=false) where {T<:AbstractH5ImageLocation}
     arr,λ = h5open(h5loc.path) do f
         return read_dataset(f,h5loc.dat),attrs(f)[h5loc.wvl]
     end

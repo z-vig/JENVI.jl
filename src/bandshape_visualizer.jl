@@ -62,7 +62,6 @@ function observer_functions(ggl,bib,hb,sb,ip)
     on(ip.coord) do o
         reset_limits!(sb.axis)
     end
-
 end
 
 """
@@ -125,9 +124,9 @@ Helps visualize and map spectral band shapes including band depth and band cente
 - `h5loc::Tuple{String,String,String}`: Tuple of hdf5 file location, dataset path and wavelength path
 """
 function bandshape_visualizer(
-    h5loc::HDF5FileLocation;
+    h5loc::T;
     flip_image::Bool = true
-) :: Nothing
+)  :: Nothing where {T<:AbstractH5ImageLocation}
 
     imcube,λ = h5open(h5loc.path) do f
         if flip_image

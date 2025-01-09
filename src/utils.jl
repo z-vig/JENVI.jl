@@ -1,18 +1,8 @@
-"""
-    HDF5FileLocation(path,dat,wvl)
-
-Holds information about where data is within an HDF5 file
-
-#Fields
-- `path`: File path for the HDF5 file
-- `dat`: Internal path to the relevant data
-- `wvl`: Internal path to wavelength attribute
-"""
-struct HDF5FileLocation
-    path::String
-    dat::String
-    wvl::String
+function norm_im(arr::Matrix{<:AbstractFloat})
+    real_arr = arr[isfinite.(arr)]
+    return (arr .- minimum(real_arr)) ./ (maximum(real_arr) - minimum(real_arr))
 end
+
 
 """
     safe_add_to_h5(h5file_obj,name,data)
@@ -31,17 +21,7 @@ function safe_add_to_h5(h5file_obj::HDF5.File,name::String,data)
     return nothing
 end
 
-"""
-    h52arr(h5fileloc::HDF5FileLocation)
 
-Returns HDF5 data from h5fileloc in an array and the wavelength vector
-"""
-function h52arr(h5fileloc::HDF5FileLocation)
-    arr,λ = h5open(h5fileloc.path) do f
-        return read(f[h5fileloc.dat]),attrs(f)[h5fileloc.wvl]
-    end
-    return arr,λ
-end
 
 """
     findλ(λ.targetλ)
@@ -53,15 +33,15 @@ function findλ(λ::Vector{Float64},targetλ::Real)::Tuple{Int,Float64}
     return (idx,λ[idx])
 end
 
-"""
-    img2h5(impath::String,h5loc::HDF5FileLocation)
+# """
+#     img2h5(impath::String,h5loc::HDF5FileLocation)
 
-Reads a .img or a .tif file at `impath` and writes it to the specified `h5loc`
-"""
-function img2h5(impath::String,h5loc::HDF5FileLocation)
-    ds = AG.read(impath)
-    arr = AG.read(ds)
-    h5open(h5loc.path,"r+") do f
-        safe_add_to_h5(f,h5loc.dat,arr)
-    end
-end
+# Reads a .img or a .tif file at `impath` and writes it to the specified `h5loc`
+# """
+# function img2h5(impath::String,h5loc::)
+#     ds = AG.read(impath)
+#     arr = AG.read(ds)
+#     h5open(h5loc.path,"r+") do f
+#         safe_add_to_h5(f,h5loc.dat,arr)
+#     end
+# end

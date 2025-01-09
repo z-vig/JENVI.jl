@@ -33,7 +33,7 @@ end
 
 Make a spectral angle map of `h5loc` using `endmembers`. If `classify` is true, returns an encoded matrix based on threshold values.
 """
-function SAM(h5loc::HDF5FileLocation,endmembers::SAMEndmembers; classify::Bool=false)
+function SAM(h5loc::T,endmembers::SAMEndmembers; classify::Bool=false) where {T<:AbstractH5ImageLocation}
     arr,λ = h52arr(h5loc)
 
     #Makes `sam` a 3D array of spectral angle values, with the third dimension being SAM values for each endmember.

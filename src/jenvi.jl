@@ -8,13 +8,19 @@ using Gtk
 using StatsBase
 using PolygonOps
 using LinearAlgebra
+using Colors
 
 include("utils.jl")
-export HDF5FileLocation,
-       h52arr,
+export norm_im,
        findλ,
        img2h5,
        safe_add_to_h5
+
+include("hdf5IO.jl")
+export H5cube,
+       H5rgb,
+       H5raster,
+       h52arr
 
 include("image_visualizer.jl")
 export image_visualizer
