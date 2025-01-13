@@ -54,13 +54,13 @@ struct H5raster <: AbstractH5ImageLocation
 end
 
 """
-    h52arr(h5fileloc::AbstractH5FileLocation)
+    h52arr(h5loc::AbstractH5FileLocation)
 
-Returns HDF5 data from an AbstractH5FileLocation.
+Returns HDF5 data from an AbstractH5FileLocation. Return type depends on the type of h5loc.
 """
 function h52arr(h5loc::T) where {T<:AbstractH5ImageLocation}
     arr,lbls = h5open(h5loc.path) do f
-        if typeof(h5loc) == H5cube
+        if typeof(h5loc) == H5cube || typeof(h5loc) == H5raster
             arr = read(f[h5loc.data])
             lbls = attrs(f)[h5loc.lbl]
         elseif typeof(h5loc) == H5rgb
@@ -68,9 +68,10 @@ function h52arr(h5loc::T) where {T<:AbstractH5ImageLocation}
             g = read(f[h5loc.data]); g = g[:,:,h5loc.green]
             b = read(f[h5loc.data]); b = b[:,:,h5loc.blue]
             arr = RGBA.(norm_im(r),norm_im(g),norm_im(b))
+            arr[isnan.(arr)] .= RGBA(0.0,0.0,0.0,0.0)
             lbls = attrs(f)[h5loc.lbl][[h5loc.red,h5loc.green,h5loc.blue]]
         end
-        arr[isnan.(arr)] .= RGBA(0.0,0.0,0.0,0.0)
+        
         return arr,lbls
     end
 

@@ -4,6 +4,7 @@ import ArchGDAL as AG
 using HDF5
 using Polynomials
 using GLMakie
+using GLFW
 using Gtk
 using StatsBase
 using PolygonOps
