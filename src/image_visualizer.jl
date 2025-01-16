@@ -27,12 +27,18 @@ Stores pertinent data from an image cube representing spectral data
     color_range::Observable{Tuple{<:AbstractFloat,<:AbstractFloat}} = @lift(extrema($finite_data))
 end
 
-@kwdef mutable struct ImageViewerLayout
+@kwdef mutable struct ImageCubeLayout
     parent_figure::Figure
     imagegrid::GridLayout = parent_figure[1,1] = GridLayout()
     histogramgrid::GridLayout = parent_figure[2,1] = GridLayout()
     slidergrid::GridLayout = parent_figure[3,1] = GridLayout()
     buttongrid::GridLayout = parent_figure[4,1] = GridLayout()
+end
+
+@kwdef mutable struct RGBLayout
+    parent_figure::Figure
+    imagegrid::GridLayout = parent_figure[1,1] = GridLayout()
+    slidergrid::GridLayout = parent_figure[2,1] = GridLayout()
 end
 
 mutable struct ButtonSelector
@@ -50,9 +56,13 @@ function get_parent_fig()::Figure
     return f
 end
 
-function adjust_parent_fig(parent_figure::Figure) :: Nothing
+function adjust_parent_fig_cube(parent_figure::Figure) :: Nothing
     rowsize!(parent_figure.layout,1,Relative(5/7)) #Main Image Axis
     rowsize!(parent_figure.layout,2,Relative(1/10)) #Hsitogram Axis
+end
+
+function adjust_parent_fig_rgb(parent_figure::Figure) :: Nothing
+    rowsize!(parent_figure.layout,1,Relative(5/7)) #Main Image Axis
 end
 
 function get_image_axis(parent_position::GridPosition)::Axis
@@ -141,38 +151,67 @@ end
 -`color_map`: color map to display the data in
 `flip_image`: Boolean for whether or not to flip the image on the y-axis. Often needed when reading from HDF5
 """
-function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image=false) where {T<:AbstractH5ImageLocation}
+function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image=false) :: Figure where {T<:AbstractH5ImageLocation}
     arr,lbls = h52arr(h5loc)
-    if flip_image arr = arr[:,end:-1:1,:]; println("test") end
+    if flip_image arr = arr[:,end:-1:1,:]; @debug "image_visualizer has flipped the image." end
 
     f = get_parent_fig()
-    ivl = ImageViewerLayout(parent_figure = f)
-    adjust_parent_fig(f)
 
     band = Observable(band)
 
     if typeof(h5loc) == H5cube
+        adjust_parent_fig(f)
+
         if isnothing(band) println("Set the band!") end
+
+        ivl = ImageCubeLayout(parent_figure = f)
+
         imdata = ImageCubeData(im_array = arr, λ=lbls, selected_band=band,color_map=color_map)
+
+        image_axis = get_image_axis(ivl.imagegrid[1,1])
+
+        bs = band_selector(f,ivl.buttongrid[1,1],imdata)
+        activate_band_selector!(bs,imdata)
+    
+        isl = color_range_selector(ivl.slidergrid[1,1],imdata)
+        activate_color_range_selector!(isl,imdata)
+    
+        hga = band_histogram(ivl.histogramgrid,imdata)
+        activate_band_histogram!(hga,imdata)
+    
+        image!(image_axis,imdata.display_matrix,colorrange=imdata.color_range,interpolate=false)
+    end
+
+    if typeof(h5loc) == H5rgb
+        adjust_parent_fig_rgb(f)
+
+        red_real = arr[isfinite.(arr[:,:,1]),1]; green_real = arr[isfinite.(arr[:,:,2]),2]; blue_real = arr[isfinite.(arr[:,:,3]),3]
+        
+        rgbl = RGBLayout(parent_figure = f)
+
+        image_axis = get_image_axis(rgbl.imagegrid[1,1])
+
+        sl_red = IntervalSlider(rgbl.slidergrid[1,1],range=range(extrema(red_real)...,500))
+        red_label = Label(rgbl.slidergrid[2,1],@lift(string(round($(sl_red.interval)[1],digits=2),", ",round($(sl_red.interval)[2],digits=2))),tellwidth=false)
+        sl_green = IntervalSlider(rgbl.slidergrid[3,1],range=range(extrema(green_real)...,500))
+        red_label = Label(rgbl.slidergrid[4,1],@lift(string(round($(sl_green.interval)[1],digits=2),", ",round($(sl_green.interval)[2],digits=2))),tellwidth=false)
+        sl_blue = IntervalSlider(rgbl.slidergrid[5,1],range=range(extrema(blue_real)...,500))
+        red_label = Label(rgbl.slidergrid[6,1],@lift(string(round($(sl_blue.interval)[1],digits=2),", ",round($(sl_blue.interval)[2],digits=2))),tellwidth=false)
+        
+        r = @lift(norm_im_controlled(arr[:,:,1],$(sl_red.interval)...))
+        g = @lift(norm_im_controlled(arr[:,:,2],$(sl_green.interval)...))
+        b = @lift(norm_im_controlled(arr[:,:,3],$(sl_blue.interval)...))
+
+        rgb = @lift(RGBA.($r,$g,$b))
+        rgb[][isnan.(rgb[])] .= RGBA(0.0,0.0,0.0,0.0)
+
+        image!(image_axis,rgb)
     end
 
 
-    image_axis = get_image_axis(ivl.imagegrid[1,1])
 
-    bs = band_selector(f,ivl.buttongrid[1,1],imdata)
-    activate_band_selector!(bs,imdata)
-
-    isl = color_range_selector(ivl.slidergrid[1,1],imdata)
-    activate_color_range_selector!(isl,imdata)
-
-    hga = band_histogram(ivl.histogramgrid,imdata)
-    activate_band_histogram!(hga,imdata)
-
-
-    image!(image_axis,imdata.display_matrix,colorrange=imdata.color_range)
-
-    DataInspector(f)
+    # DataInspector(f)
     display(GLMakie.Screen(focus_on_show=true),f)
 
-    return nothing
+    return f
 end

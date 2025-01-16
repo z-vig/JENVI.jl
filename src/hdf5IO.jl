@@ -67,8 +67,9 @@ function h52arr(h5loc::T) where {T<:AbstractH5ImageLocation}
             r = read(f[h5loc.data]); r = r[:,:,h5loc.red]
             g = read(f[h5loc.data]); g = g[:,:,h5loc.green]
             b = read(f[h5loc.data]); b = b[:,:,h5loc.blue]
-            arr = RGBA.(norm_im(r),norm_im(g),norm_im(b))
-            arr[isnan.(arr)] .= RGBA(0.0,0.0,0.0,0.0)
+            arr = cat(r,g,b,dims=3)
+            # arr = RGBA.(norm_im(r),norm_im(g),norm_im(b))
+            # arr[isnan.(arr)] .= RGBA(0.0,0.0,0.0,0.0)
             lbls = attrs(f)[h5loc.lbl][[h5loc.red,h5loc.green,h5loc.blue]]
         end
         

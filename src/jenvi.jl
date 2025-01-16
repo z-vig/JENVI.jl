@@ -10,9 +10,13 @@ using StatsBase
 using PolygonOps
 using LinearAlgebra
 using Colors
+using DSP
+using Interpolations
+using LazySets
 
 include("utils.jl")
 export norm_im,
+       norm_im_controlled,
        findλ,
        img2h5,
        safe_add_to_h5
@@ -22,6 +26,10 @@ export H5cube,
        H5rgb,
        H5raster,
        h52arr
+
+include("pretty_axes.jl")
+export format_regular!,
+       format_continuum_removed!
 
 include("image_visualizer.jl")
 export image_visualizer
@@ -46,5 +54,11 @@ export bandshape_visualizer
 include("spectral_angle_map.jl")
 export SAMEndmembers,
        SAM
+
+include("spectral_operations/spectral_smoothing.jl")
+export moving_avg
+
+include("spectral_operations/continuum_removal.jl")
+export double_line_removal
 
 end #module

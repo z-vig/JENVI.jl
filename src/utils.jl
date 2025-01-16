@@ -3,6 +3,12 @@ function norm_im(arr::Matrix{<:AbstractFloat})
     return (arr .- minimum(real_arr)) ./ (maximum(real_arr) - minimum(real_arr))
 end
 
+function norm_im_controlled(arr::Matrix{<:AbstractFloat},lo::T,hi::T) where {T<:AbstractFloat}
+    arr[arr.>hi] .= hi
+    arr[arr.<lo] .= lo
+    return (arr .- lo) ./ (hi - lo)
+end
+
 
 """
     safe_add_to_h5(h5file_obj,name,data)

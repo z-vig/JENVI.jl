@@ -7,194 +7,266 @@ Collect Spectrum (double left click)
 Average Current Collection (a)
 """
 
-@kwdef mutable struct PointSpectra
-    cube_size :: Tuple{Int64,Int64,Int64}
-    collect_pointspec :: Bool = false
-    test_coord:: Observable{GLMakie.Point{2,Int}} = Observable(GLMakie.Point{2,Int}(cube_size[1]÷2,cube_size[2]÷2))
-    spec_coord:: Observable{GLMakie.Point{2,Int}} = Observable(GLMakie.Point{2,Int}(cube_size[1]÷2,cube_size[2]÷2))
-    img_axis:: Axis
-    tracking_coord:: Observable{GLMakie.Point{2,Float64}} = Observable(GLMakie.Point{2,Float64}(cube_size[1]/2,cube_size[2]/2))
-    tracking_lines:: Vector{Plot} = Vector{Plot}(undef,2)
-    nspec :: Int = 0
-    cmap :: Symbol = :tab10
-    maxspec :: Int = 10
-    spec_pts :: Vector{Plot} = []
-    collected_spec :: Vector{Plot} = []
-    collected_spec_data :: Array{<:AbstractFloat,2} = Array{AbstractFloat}(undef,0,cube_size[3])
-    collected_spec_pts :: Vector{GLMakie.Point{2,Int}} = Vector{GLMakie.Point{2,Int}}(undef,0)
-    mark_size :: Observable{Float64} = Observable(10)
-    ttip :: Plot{tooltip} = tooltip!(img_axis,0,0,"")
+const SPECTRAL_ASPECT_RATIO = 5/4
+
+SPECTRAL_PLOT_COLORMAP = distinguishable_colors(12, [RGB(1,0,0), RGB(0,1,0), RGB(0,0,1)], dropseed=false)
+
+@kwdef mutable struct SpectralViewerLayout
+    parent_figure::Figure
+    spectrumgrid::GridLayout = parent_figure[1,1] = GridLayout()
+    buttongrid::GridLayout = parent_figure[2,1] = GridLayout()
+    legendgrid::GridLayout = parent_figure[1,2] = GridLayout()
 end
 
-function Makie.process_interaction(interaction::PointSpectra, event::MouseEvent, axis)
-    if event.type === MouseEventTypes.over && interaction.collect_pointspec
-        pt = round.(Int,event.data) .+ 0.5
-        interaction.tracking_coord[] = pt
-    end
-    if event.type === MouseEventTypes.leftclick && interaction.collect_pointspec
-        pt = round.(Int,event.data)
-        println("($(pt[1]),$(pt[2])) Selected!")
-        interaction.test_coord[] = pt
-    end
-    
-    if event.type === MouseEventTypes.leftdoubleclick && interaction.collect_pointspec
-        interaction.nspec += 1
-        pt = round.(Int,event.data)
-        s = scatter!(interaction.img_axis,pt,color=interaction.nspec,colormap=interaction.cmap,colorrange=(1,interaction.maxspec),marker=:cross, markersize=interaction.mark_size,glowcolor=(:black,2),glowwidth=2)
-        push!(interaction.spec_pts,s)
-        interaction.spec_coord[] = pt
-    end
-
+struct SpectrumData
+    λ::Vector{<:AbstractFloat}
+    data::Observable{Vector{<:AbstractFloat}}
+    name::String
+    color::RGB
+    plot::Plot
+    xpixel::Int
+    ypixel::Int
+    legend_entry::LineElement
 end
 
-function spectrum_visualizer(
-    fig:: Figure, 
-    h5file:: String, 
-    name_vec:: Vector{String},
-    collect_idx:: Int,
-    legend_strings ::Vector{String}, 
-    symb::Symbol, 
-    wavelength_path:: String; 
-    flip_image::Bool = false, save_file::String="save.txt",overwrite_save::Bool=true, ax_title::String = "", plotspx::Union{Nothing,Vector{<:Dict}}= nothing
-)
+@kwdef mutable struct SpectraSearch
+    cube_size::Tuple{Int,Int,Int}
+    active::Observable{Bool} = Observable(false)
+    cursor_tracker::Observable{GLMakie.Point{2,Float32}} = Observable{GLMakie.Point{2,Float32}}((0,0))
+    selected_tracker::Observable{GLMakie.Point{2,Int}} = Observable{GLMakie.Point{2,Int}}((0,0))
+    tracker_lines::Vector{Plot} = Vector{Plot}(undef,0)
+    current_spectrum::Vector{Float32} = Vector{Float32}(undef,cube_size[3])
+    current_plot::Vector{Plot} = Vector{Plot}(undef,0)
+end
 
-    img_axis = fig.content[1]
-    f = Figure(size=(1500,500))
-    spec_aspect = 5/4
+@kwdef mutable struct SpectraCollection
+    cube_size::Tuple{Int,Int,Int}
+    active::Observable{Bool} = Observable(false)
+    collect_number::Observable{Int} = Observable(0)
+    spectra::Vector{SpectrumData} = Vector{SpectrumData}(undef,0)
+    custom_name::Observable{Bool} = Observable(true)
+end
 
-    save_grid = f[2,1] = GridLayout()
-    b = Button(save_grid[1,1],label = "Write Spectrum",tellwidth=false)
-    b1 = Button(save_grid[1,2],label="Write Spectra",tellwidth=false)
-    b2 = Button(f[2,2],label="Reset",tellwidth=false)
-
-    if !isfile(save_file) || overwrite_save
-        open(save_file,"w") do io
-        end
-    end
-
-    spec_data, wvl = h5open(h5file) do f
-        dsize = size(f[name_vec[1]])
-        spec_data = Array{Float64}(undef,dsize...,0)
-        for name in name_vec
-            spcd = f[name][:,:,:]
-            if flip_image
-                spec_data = cat(spec_data,spcd[:,end:-1:1,:],dims=4)
-            else
-                spec_data = cat(spec_data,spcd[:,:,:],dims=4)
-            end
-        end
-        return spec_data,attrs(f)[wavelength_path]
-    end
-
-    msize_sl = Slider(fig[5,1],range=5:0.1:20,startvalue=10)
-
-    mypointspec = PointSpectra(cube_size = size(spec_data)[1:3],img_axis=img_axis,mark_size=msize_sl.value)
-
-    spec_axis = Axis(f[1,1],title= ax_title,aspect=spec_aspect)
-    clct_title = Observable(0)
-    collect_axis = Axis(f[1,2],title=@lift(string($clct_title)*" Spectra Collected"),aspect=spec_aspect)
-    avg_axis = Axis(f[1,3],aspect=spec_aspect)
-
-    on(events(img_axis).keyboardbutton) do event
-        if event.key == Keyboard.m && event.action == Keyboard.press
-            mypointspec.collect_pointspec = true
-            v = vlines!(mypointspec.img_axis,@lift($(mypointspec.tracking_coord)[1]),1,mypointspec.cube_size[2],color=:red)
-            h = hlines!(mypointspec.img_axis,@lift($(mypointspec.tracking_coord)[2]),1,mypointspec.cube_size[1],color=:red)
-            mypointspec.tracking_lines = [v,h]
-            tt_string = @lift(string($(mypointspec.tracking_coord).-0.5))
-            println(tt_string)
-            tt = tooltip!(mypointspec.img_axis,mypointspec.tracking_coord,tt_string)
-            mypointspec.ttip = tt
-        end
-        if event.key == Keyboard.l && event.action == Keyboard.press
-            mypointspec.collect_pointspec = false
-            for i in mypointspec.tracking_lines
-                delete!(mypointspec.img_axis,i)
-            end
-        end
-        if event.key == Keyboard.a && event.action == Keyboard.press
-
-            avg = mean(mypointspec.collected_spec_data,dims=1)
-
-            lines!(avg_axis,wvl,vec(avg),label=string(size(mypointspec.collected_spec_data,1))*" Spectra")
-            mypointspec.collected_spec_data = Array{AbstractFloat}(undef,0,mypointspec.cube_size[3])
-            empty!(collect_axis)
-            # axislegend(avg_axis,position=:lt)
-        end
-    end
-
-    plotted_spec = Vector{Observable}(undef,size(spec_data,4))
-    for i = axes(spec_data,4)
-        spec = @lift(spec_data[$(mypointspec.test_coord)...,:,i])
-        if isnothing(plotspx)
-            lines!(spec_axis,wvl,spec,label=legend_strings[i])
-        else    
-            lines!(spec_axis,wvl,spec,label=legend_strings[i]; plotspx[i]...)
-        end
-        # scatter!(spec_axis,wvl,spec,marker=:circle,color=:black,markersize=5)
-        plotted_spec[i] = spec
-    end
-
-    on(mypointspec.test_coord) do ob
-        ma = max([maximum(to_value(i)) for i in plotted_spec]...)
-        mi = min([minimum(to_value(i)) for i in plotted_spec]...)
-        ylims!(spec_axis,mi-(0.1*mi),ma+(0.1*ma))
-        # println(spec_data[to_value(mypointspec.test_coord)...,1:10,1])
-        # println(spec_data[to_value(mypointspec.test_coord)...,1:10,2])
-    end
-
-    on(mypointspec.spec_coord) do ob
-        selected_spec = spec_data[to_value(mypointspec.spec_coord)...,:,collect_idx]
-        cs = lines!(collect_axis,wvl,selected_spec,color=mypointspec.nspec,colormap=mypointspec.cmap,colorrange=(1,mypointspec.maxspec))
-        reset_limits!(collect_axis)
-        push!(mypointspec.collected_spec,cs)
-        selected_spec_r = reshape(selected_spec,1,size(selected_spec)...)
-        mypointspec.collected_spec_data = cat(mypointspec.collected_spec_data,selected_spec_r,dims=1)
-        push!(mypointspec.collected_spec_pts,(to_value(mypointspec.spec_coord)))
-        clct_title[] = length(mypointspec.collected_spec)
-    end
-
-    on(b.clicks) do f
-        open(save_file,"a") do io
-            println(io,to_value(@lift(spec_data[$(mypointspec.spec_coord)...,:,1])))
-        end
-        println("Spectrum saved to $save_file")
-        scatter!(img_axis,to_value(mypointspec.spec_coord),marker=:star6,markersize=20)
-    end
-
-    on(b1.clicks) do f
-        open(save_file,"a") do io
-            for (n,row) in enumerate(eachrow(mypointspec.collected_spec_data))
-                println(io,row," $(mypointspec.collected_spec_pts[n])")
-            end
-        end
-        println("Spectra saved to $save_file","  ",size(mypointspec.collected_spec_data))
-    end
-
-    on(b2.clicks) do f
-        for i in mypointspec.collected_spec
-            delete!(collect_axis,i)
-        end
-        for j in mypointspec.spec_pts
-            delete!(mypointspec.img_axis,j)
-        end
-        mypointspec.spec_pts = []
-        mypointspec.collected_spec = []
-        mypointspec.collected_spec_data = []
-        mypointspec.nspec = 0
-    end
-
-    axislegend(spec_axis,position=:lt)
-
-    try
-        register_interaction!(img_axis, symb, mypointspec)
-    catch
-        deregister_interaction!(img_axis,symb)
-        register_interaction!(img_axis, symb, mypointspec)
-    end
-    
-    # DataInspector(f)
-    display(GLMakie.Screen(),f)
-
+function get_parent_fig_sv()::Figure
+    m1 = GLFW.GetPrimaryMonitor()
+    vm = GLFW.GetVideoMode(m1)
+    f = Figure(fonts = (; regular="Verdana",bold="Verdana Bold"),size=(vm.width/2,vm.height/2))
     return f
+end
+
+function adjust_parent_fig_sv(parent_figure::Figure,svl::SpectralViewerLayout)::Nothing
+    rowsize!(parent_figure.layout,1,Relative(7/8))
+    colsize!(parent_figure.layout,2,Relative(1/8))
+    # colsize!(svl.spectrumgrid,3,Relative(1/9))
+    # colsize!(svl.spectrumgrid,4,Relative(1/9))
+    return nothing
+end
+
+function get_spectrum_axis(parent_position::GridPosition,λ::Vector{<:AbstractFloat}) :: Axis
+    spectrum_axis = Axis(parent_position,aspect=SPECTRAL_ASPECT_RATIO)
+    format_regular!(spectrum_axis)
+    xlims!(extrema(λ)...)
+    ylims!(0,0.5)
+    return spectrum_axis
+end
+
+function activate_tracking_lines!(ss::SpectraSearch,image_axis::Axis) :: Nothing
+    on(ss.active) do ob
+        if ob
+            @debug "Current Limits: " current_limits
+            v = vlines!(image_axis,@lift($(ss.cursor_tracker)[1]),1,ss.cube_size[2],color=:red)
+            h = hlines!(image_axis,@lift($(ss.cursor_tracker)[2]),1,ss.cube_size[1],color=:red)
+            push!(ss.tracker_lines,v)
+            push!(ss.tracker_lines,h)
+            @debug "Tracker lines stored: " length(ss.tracker_lines)
+        elseif !ob
+            for i in ss.tracker_lines delete!(image_axis,i) end
+        end
+    end
+    return nothing
+end
+
+function plot_spectrum_data!(imax::Axis,specax::Axis,sd::SpectrumData)::Nothing
+    lines!(specax,sd.λ,sd.data,color=sd.color,label=sd.name)
+    scatter!(imax,sd.xpixel,sd.ypixel,color=sd.color,strokecolor=:black,strokewidth=2)
+    return nothing
+end
+
+function activate_spectral_operations!(parent_figure::Figure,parent_position::GridLayout,collect_axis::Axis, image_axis::Axis,sc::SpectraCollection) :: Nothing
+    b1 = parent_position[1,1] = Button(parent_figure,label="Smooth Spectra",tellwidth=false)
+    b2 = parent_position[1,2] = Button(parent_figure,label="Remove Continuum")
+    tog_gp = parent_position[1,3] = GridLayout()
+    colsize!(parent_position,3,100)
+    l1 = Label(tog_gp[1,1],"New Plot?",tellheight=false,tellwidth=false)
+    t1 = Toggle(tog_gp[1,2],tellheight=false,tellwidth=false)
+
+    on(b1.clicks) do butt
+        for i in sc.spectra
+            lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.6)
+            i.data[],σ = moving_avg(i.data[])
+        end
+    end
+
+    on(b2.clicks) do butt
+        f_contrem = Figure(); ax_contrem = Axis(f_contrem[1,1])
+        format_continuum_removed!(ax_contrem)
+        xlims!(extrema(sc.spectra[1].λ)...)
+        for i in sc.spectra
+            continuum_line,continuum_removed = double_line_removal(i.λ.*1000,i.data[])
+            lines!(collect_axis,i.λ,continuum_line,color=i.color,alpha=0.8)
+            lines!(ax_contrem,i.λ,continuum_removed,color=i.color)
+        end
+        display(GLMakie.Screen(),f_contrem)
+    end
+    return nothing
+end
+
+function activate_save_buttons!(parent::GridPosition,sc::SpectraCollection)::Nothing
+    return nothing
+end
+
+function custom_name_box(parent_position::GridPosition)::Observable
+    txt = Textbox(parent_position[1,1],placeholder="Enter Spectrum Name...",tellheight=false,tellwidth=false)
+    return txt.stored_string
+end
+
+function activate_toggles!(parent_position::GridPosition,sc::SpectraCollection)::Nothing
+    t1_grid = parent_position[1,1]
+    t1_label = Label(t1_grid[1,1],"Set Custom\n Spectrum Name?",tellheight=false)
+    t1_toggle = Toggle(t1_grid[1,2],tellheight=false,tellwidth=false)
+    sc.custom_name = t1_toggle.active
+    return nothing
+end
+
+function Makie.process_interaction(interaction::Union{SpectraSearch,SpectraCollection}, event::KeysEvent, axis)
+
+    if Makie.Keyboard.m in event.keys
+        interaction.active[] = true
+    elseif Makie.Keyboard.l in event.keys
+        interaction.active[] = false
+    end
+
+    if Makie.Keyboard.right in event.keys && typeof(interaction) == SpectraCollection
+        interaction.collect_number[] += 1
+    end
+
+    @debug "SearchSpectra active state: " interaction.active typeof(interaction)
+end
+
+function Makie.process_interaction(interaction::SpectraSearch, event::MouseEvent, axis)
+    if to_value(interaction.active)
+        if event.type === MouseEventTypes.over
+            interaction.cursor_tracker[] = event.data
+        end
+        if event.type == MouseEventTypes.leftclick
+            pt = round.(Int,event.data)
+            interaction.selected_tracker[] = pt
+
+            @info "Plotted Spectrum at ($(to_value(interaction.selected_tracker)[1]), $(to_value(interaction.selected_tracker)[2]))"
+        end
+    end
+end
+
+# function Makie.process_interaction(interaction::SpectraCollection, event::MouseEvent,axis)
+#     if to_value(interaction.active)
+#         if event.type == MouseEventTypes.leftdoubleclick
+#             interaction.collect_number[] += 1
+#         end
+#     end
+# end
+
+"""
+    spectrum_visualizer()
+
+Attaches a spectral visualizer window to an existing image visualizer window.
+
+#Arguments
+-`connected_image`: The figure object from the connected image visualizer
+-`h5loc`: AbstractH5FileLocation of the spectral data
+-`flip_image`: Boolean to flip the image along the y-axis
+"""
+function spectrum_visualizer(
+    connected_image::Figure, 
+    h5loc::T;
+    flip_image::Bool = false
+) :: Nothing where {T<:AbstractH5ImageLocation}
+
+    #Loads in data from h5loc file
+    arr,λ = h52arr(h5loc)
+    λ = λ./1000
+    #Flips the image along the y-axis
+    if flip_image arr = arr[:,end:-1:1,:]; @debug "spectrum_visualizer has flipped the image." end
+
+    #Gets image axis object from the connected_image figure
+    image_axis = connected_image.content[1]
+
+    #sets up the spectrum axis
+    f = get_parent_fig_sv()
+    svl = SpectralViewerLayout(parent_figure = f)
+    spectrum_axis = get_spectrum_axis(svl.spectrumgrid[1,1],λ)
+    collection_axis = get_spectrum_axis(svl.spectrumgrid[1,2],λ)
+
+    #Initializing state objects for collecting and searching for spectra
+    ss = SpectraSearch(cube_size = arr.size)
+    sc = SpectraCollection(cube_size = arr.size)
+
+    collection_legend = Legend(svl.legendgrid[1,1],[],[])
+
+    #Activates horizontal and vertical lines that appear in collection mode
+    activate_tracking_lines!(ss,image_axis)
+
+    #Registering clicks and keyboard presses
+    register_interaction!(image_axis,:specsearch,ss)
+    register_interaction!(image_axis,:speccollect,sc)
+
+    bg1 = svl.buttongrid[1,1] = GridLayout()
+    activate_spectral_operations!(f,bg1,collection_axis,image_axis,sc)
+    # activate_toggles!(svl.spectrumgrid[1,4],sc)
+    current_name = custom_name_box(svl.legendgrid[2,1])
+
+    #Observable function for plotting a single spectrum
+    on(ss.selected_tracker) do ob
+        if !isempty(ss.current_spectrum)
+            for i in ss.current_plot delete!(spectrum_axis,i) end
+        end
+        current_spec = arr[ob[1],ob[2],:]
+        l = lines!(spectrum_axis,λ,current_spec,color=:black)
+        autolimits!(spectrum_axis)
+        ss.current_spectrum = current_spec
+        push!(ss.current_plot,l)
+        @debug "Plotting Spectrum" ob
+    end
+
+    #Observable function for adding a spectrum to the spectra collection
+    on(sc.collect_number) do ob
+        @debug "Custom Name Boolean:" sc.custom_name
+        if !isnothing(current_name[])
+            name = current_name[]
+        else
+            name = "spectrum$(to_value(ob))"
+        end
+        current_specdata = SpectrumData(
+            λ,Observable(ss.current_spectrum),
+            name,
+            SPECTRAL_PLOT_COLORMAP[to_value(ob)],
+            ss.current_plot[1],
+            to_value(ss.selected_tracker)...,
+            LineElement(color=SPECTRAL_PLOT_COLORMAP[to_value(ob)],label=name)
+            )
+
+        push!(sc.spectra,current_specdata)
+
+        scatter!(image_axis,current_specdata.xpixel,current_specdata.ypixel,color=current_specdata.color,strokewidth=2,strokecolor=:black)
+        lines!(collection_axis,current_specdata.λ,current_specdata.data,color=current_specdata.color,label=current_specdata.name)
+        autolimits!(collection_axis)
+
+        leg_entry = LegendEntry([current_specdata.legend_entry],current_specdata.legend_entry.attributes)
+        push!(collection_legend.entrygroups[][1][2],leg_entry)
+        notify(collection_legend.entrygroups)
+        @debug "SpectraCollection length: " length(sc.spectra)
+    end
+
+    adjust_parent_fig_sv(f,svl)
+    display(GLMakie.Screen(),f)
+    return nothing
 end
