@@ -78,3 +78,49 @@ function h52arr(h5loc::T) where {T<:AbstractH5ImageLocation}
 
     return arr,lbls
 end
+
+function export_spectra(ax::Axis,save_folder::String,sc::SpectraCollection;savename::Union{String,Nothing}=nothing)
+    CairoMakie.activate!()
+    f = Figure(fonts = (; regular="Verdana",bold="Verdana Bold"),backgroundcolor=:transparent)
+    save_axis = Axis(f[1,1],backgroundcolor=:transparent)
+    format_regular!(save_axis)
+    colors,plot_data,λ = copy_spectral_axis!(ax,save_axis)
+    names = [i.name for i in sc.spectra]
+
+    if isnothing(savename)
+        savestring = joinpath(save_folder,string("spectralplot_",Dates.format(now(),"yyyymmddTIIMMSS")))
+    else
+        savestring = joinpath(save_folder,string("spectralplot_",savename))
+    end
+    CairoMakie.save("$savestring.svg",f)
+
+    h5open("$(savestring)_data.hdf5","w") do f
+        for (n,name) ∈ enumerate(names)
+            # println(typeof(plot_data[n,:]))
+            f[name] = plot_data[n,:]
+        end
+    end
+    GLMakie.activate!()
+    return f
+end
+
+function export_image(ax::Axis,save_folder::String; savename::Union{String,Nothing}=nothing)
+    CairoMakie.activate!()
+    f = Figure(fonts = (; regular="Verdana",bold="Verdana Bold"),backgroundcolor=:transparent)
+    save_axis = Axis(f[1,1],backgroundcolor=:transparent,aspect=DataAspect())
+    hidedecorations!(save_axis); hidespines!(save_axis)
+    names,pts = copy_image_axis!(ax,save_axis)
+    if isnothing(savename)
+        savestring = joinpath(save_folder,string("image_",Dates.format(now(),"yyyymmddTIIMMSS")))
+    else
+        savestring = joinpath(save_folder,string("image_",savename))
+    end
+    CairoMakie.save("$(savestring).png",f)
+
+    open(joinpath(save_folder,string("$savestring","_pts.txt")),"w") do f
+        println(f,"Color\tx\ty")
+        for (name,pt) in zip(names,pts)
+            println(f,"$name\t$(pt[1])\t$(pt[2])")
+        end
+    end
+end

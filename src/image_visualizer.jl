@@ -37,8 +37,8 @@ end
 
 @kwdef mutable struct RGBLayout
     parent_figure::Figure
-    imagegrid::GridLayout = parent_figure[1,1] = GridLayout()
-    slidergrid::GridLayout = parent_figure[2,1] = GridLayout()
+    imagegrid::GridLayout = parent_figure[1:20,1] = GridLayout()
+    slidergrid::GridLayout = parent_figure[5,2] = GridLayout()
 end
 
 mutable struct ButtonSelector
@@ -62,13 +62,13 @@ function adjust_parent_fig_cube(parent_figure::Figure) :: Nothing
 end
 
 function adjust_parent_fig_rgb(parent_figure::Figure) :: Nothing
-    rowsize!(parent_figure.layout,1,Relative(5/7)) #Main Image Axis
+    colsize!(parent_figure.layout,1,Relative(5/7)) #Main Image Axis
 end
 
 function get_image_axis(parent_position::GridPosition)::Axis
     image_axis = Axis(parent_position,aspect=DataAspect())
     hidedecorations!(image_axis)
-    hidespines!(image_axis)
+    # hidespines!(image_axis)
     return image_axis
 end
 
@@ -192,23 +192,33 @@ function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image
         image_axis = get_image_axis(rgbl.imagegrid[1,1])
 
         sl_red = IntervalSlider(rgbl.slidergrid[1,1],range=range(extrema(red_real)...,500))
-        red_label = Label(rgbl.slidergrid[2,1],@lift(string(round($(sl_red.interval)[1],digits=2),", ",round($(sl_red.interval)[2],digits=2))),tellwidth=false)
+        red_label = Label(rgbl.slidergrid[2,1],@lift(string("Red Adjustment:",round($(sl_red.interval)[1],digits=2),", ",round($(sl_red.interval)[2],digits=2))),tellwidth=false)
         sl_green = IntervalSlider(rgbl.slidergrid[3,1],range=range(extrema(green_real)...,500))
-        red_label = Label(rgbl.slidergrid[4,1],@lift(string(round($(sl_green.interval)[1],digits=2),", ",round($(sl_green.interval)[2],digits=2))),tellwidth=false)
+        green_label = Label(rgbl.slidergrid[4,1],@lift(string("Green Adjustment:",round($(sl_green.interval)[1],digits=2),", ",round($(sl_green.interval)[2],digits=2))),tellwidth=false)
         sl_blue = IntervalSlider(rgbl.slidergrid[5,1],range=range(extrema(blue_real)...,500))
-        red_label = Label(rgbl.slidergrid[6,1],@lift(string(round($(sl_blue.interval)[1],digits=2),", ",round($(sl_blue.interval)[2],digits=2))),tellwidth=false)
+        blue_label = Label(rgbl.slidergrid[6,1],@lift(string("Blue Adjustment:",round($(sl_blue.interval)[1],digits=2),", ",round($(sl_blue.interval)[2],digits=2))),tellwidth=false)
         
         r = @lift(norm_im_controlled(arr[:,:,1],$(sl_red.interval)...))
         g = @lift(norm_im_controlled(arr[:,:,2],$(sl_green.interval)...))
         b = @lift(norm_im_controlled(arr[:,:,3],$(sl_blue.interval)...))
 
         rgb = @lift(RGBA.($r,$g,$b))
+
+        sl_all = Slider(rgbl.slidergrid[7,1],range=0.1:0.01:4,startvalue=1)
+        brightness_color = @lift(RGBA($(sl_all.value),$(sl_all.value),$(sl_all.value),1))
+        brightness_label = Label(rgbl.slidergrid[8,1],@lift(string("Brightness: ",$(sl_all.value))),tellwidth=false)
+
+        rgb_multiply(x,y) = x ⊙ y
+
+        rgb = @lift(mult_rgb.($rgb, $brightness_color))
+        println(typeof(rgb))
         rgb[][isnan.(rgb[])] .= RGBA(0.0,0.0,0.0,0.0)
+        on(rgb) do ob
+            rgb[][isnan.(rgb[])] .= RGBA(0.0,0.0,0.0,0.0)
+        end
 
-        image!(image_axis,rgb)
+        image!(image_axis,rgb,interpolate=false)
     end
-
-
 
     # DataInspector(f)
     display(GLMakie.Screen(focus_on_show=true),f)

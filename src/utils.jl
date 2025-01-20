@@ -39,6 +39,17 @@ function findλ(λ::Vector{Float64},targetλ::Real)::Tuple{Int,Float64}
     return (idx,λ[idx])
 end
 
+function rgb2vec(rgb::RGBA)
+    return vec([rgb.r,rgb.g,rgb.b,rgb.alpha])
+end
+
+function mult_rgb(x::RGBA,y::RGBA)
+    mul = x ⊙ y
+    mul_vec = rgb2vec(mul)
+    mul_vec[mul_vec.>1] .= 1
+    return RGBA(mul_vec...)
+end
+
 # """
 #     img2h5(impath::String,h5loc::HDF5FileLocation)
 
@@ -51,3 +62,41 @@ end
 #         safe_add_to_h5(f,h5loc.dat,arr)
 #     end
 # end
+
+function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Matrix{Float32},Vector{Float32}}
+    name_vec = Vector{String}(undef,0)
+    plot_wavelengths = Vector{Float32}(src.scene.plots[1].args[1][])
+    nbands = length(plot_wavelengths)
+    plot_data = Matrix{Float32}(undef,0,nbands)
+    
+    for pl in src.scene.plots
+        x = pl.args[1][]
+        y = pl.args[2][]
+        lines!(dst,x,y,color=pl.color,linestyle=pl.linestyle,linewidth=pl.linewidth)
+        name = string(pl.color[],"_",pl.linestyle[])
+        push!(name_vec,name)
+        plot_data = cat(plot_data,y',dims=1)
+    end
+    return name_vec,plot_data,plot_wavelengths
+end
+
+function copy_image_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Tuple}}
+    pt_list = Vector{Tuple}(undef,0)
+    name_list = Vector{String}(undef,0)
+    for pl in src.scene.plots
+        if typeof(pl) <: Image
+            imdata = src.scene.plots[1].args[1][]
+            println(any(isnan.(imdata)))
+            image!(dst,imdata,interpolate=false)
+        elseif typeof(pl) <: Scatter
+            pt = (pl.args[1][],pl.args[2][])
+            push!(pt_list,pt)
+            push!(name_list,string(pl.color[]))
+            scatter!(dst,pt,color=pl.color,strokecolor=pl.strokecolor,strokewidth=pl.strokewidth)
+        else
+            @error "There is an unrecognized plot component!"
+        end
+    end
+
+    return name_list,pt_list
+end

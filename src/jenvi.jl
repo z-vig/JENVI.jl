@@ -3,6 +3,7 @@ module jenvi
 import ArchGDAL as AG
 using HDF5
 using Polynomials
+using CairoMakie
 using GLMakie
 using GLFW
 using Gtk
@@ -13,19 +14,29 @@ using Colors
 using DSP
 using Interpolations
 using LazySets
+using ColorVectorSpace
+using Dates
+
+GLMakie.activate!()
+
+include("spectrum_visualizer_structs.jl")
 
 include("utils.jl")
 export norm_im,
        norm_im_controlled,
        findλ,
        img2h5,
-       safe_add_to_h5
+       safe_add_to_h5,
+       copy_spectral_axis!,
+       mult_rgb
 
 include("hdf5IO.jl")
 export H5cube,
        H5rgb,
        H5raster,
-       h52arr
+       h52arr,
+       export_spectra,
+       export_image
 
 include("pretty_axes.jl")
 export format_regular!,

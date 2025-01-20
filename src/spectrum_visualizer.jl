@@ -8,44 +8,12 @@ Average Current Collection (a)
 """
 
 const SPECTRAL_ASPECT_RATIO = 5/4
+const SPECTRAL_LINE_WIDTH = 3
+const SMOOTHING_KERNEL_SIZE = 7
 
 SPECTRAL_PLOT_COLORMAP = distinguishable_colors(12, [RGB(1,0,0), RGB(0,1,0), RGB(0,0,1)], dropseed=false)
 
-@kwdef mutable struct SpectralViewerLayout
-    parent_figure::Figure
-    spectrumgrid::GridLayout = parent_figure[1,1] = GridLayout()
-    buttongrid::GridLayout = parent_figure[2,1] = GridLayout()
-    legendgrid::GridLayout = parent_figure[1,2] = GridLayout()
-end
-
-struct SpectrumData
-    λ::Vector{<:AbstractFloat}
-    data::Observable{Vector{<:AbstractFloat}}
-    name::String
-    color::RGB
-    plot::Plot
-    xpixel::Int
-    ypixel::Int
-    legend_entry::LineElement
-end
-
-@kwdef mutable struct SpectraSearch
-    cube_size::Tuple{Int,Int,Int}
-    active::Observable{Bool} = Observable(false)
-    cursor_tracker::Observable{GLMakie.Point{2,Float32}} = Observable{GLMakie.Point{2,Float32}}((0,0))
-    selected_tracker::Observable{GLMakie.Point{2,Int}} = Observable{GLMakie.Point{2,Int}}((0,0))
-    tracker_lines::Vector{Plot} = Vector{Plot}(undef,0)
-    current_spectrum::Vector{Float32} = Vector{Float32}(undef,cube_size[3])
-    current_plot::Vector{Plot} = Vector{Plot}(undef,0)
-end
-
-@kwdef mutable struct SpectraCollection
-    cube_size::Tuple{Int,Int,Int}
-    active::Observable{Bool} = Observable(false)
-    collect_number::Observable{Int} = Observable(0)
-    spectra::Vector{SpectrumData} = Vector{SpectrumData}(undef,0)
-    custom_name::Observable{Bool} = Observable(true)
-end
+GLMakie.activate!()
 
 function get_parent_fig_sv()::Figure
     m1 = GLFW.GetPrimaryMonitor()
@@ -87,41 +55,62 @@ function activate_tracking_lines!(ss::SpectraSearch,image_axis::Axis) :: Nothing
 end
 
 function plot_spectrum_data!(imax::Axis,specax::Axis,sd::SpectrumData)::Nothing
-    lines!(specax,sd.λ,sd.data,color=sd.color,label=sd.name)
+    lines!(specax,sd.λ,sd.data,color=sd.color,label=sd.name,linewidth=SPECTRAL_LINE_WIDTH,linestyle=:solid)
     scatter!(imax,sd.xpixel,sd.ypixel,color=sd.color,strokecolor=:black,strokewidth=2)
     return nothing
 end
 
-function activate_spectral_operations!(parent_figure::Figure,parent_position::GridLayout,collect_axis::Axis, image_axis::Axis,sc::SpectraCollection) :: Nothing
+function activate_spectral_operations!(parent_figure::Figure,parent_position::GridLayout,collect_axis::Axis,sc::SpectraCollection) :: Axis
     b1 = parent_position[1,1] = Button(parent_figure,label="Smooth Spectra",tellwidth=false)
     b2 = parent_position[1,2] = Button(parent_figure,label="Remove Continuum")
     tog_gp = parent_position[1,3] = GridLayout()
     colsize!(parent_position,3,100)
-    l1 = Label(tog_gp[1,1],"New Plot?",tellheight=false,tellwidth=false)
-    t1 = Toggle(tog_gp[1,2],tellheight=false,tellwidth=false)
+    # l1 = Label(tog_gp[1,1],"New Plot?",tellheight=false,tellwidth=false)
+    # t1 = Toggle(tog_gp[1,2],tellheight=false,tellwidth=false)
 
     on(b1.clicks) do butt
         for i in sc.spectra
             lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.6)
-            i.data[],σ = moving_avg(i.data[])
+            i.data[],σ = moving_avg(i.data[],box_size = SMOOTHING_KERNEL_SIZE)
         end
     end
 
+    f_contrem = Figure(fonts = (; regular="Verdana",bold="Verdana Bold")); ax_contrem = Axis(f_contrem[1,1])
     on(b2.clicks) do butt
-        f_contrem = Figure(); ax_contrem = Axis(f_contrem[1,1])
         format_continuum_removed!(ax_contrem)
         xlims!(extrema(sc.spectra[1].λ)...)
         for i in sc.spectra
             continuum_line,continuum_removed = double_line_removal(i.λ.*1000,i.data[])
-            lines!(collect_axis,i.λ,continuum_line,color=i.color,alpha=0.8)
-            lines!(ax_contrem,i.λ,continuum_removed,color=i.color)
+            lines!(collect_axis,i.λ,continuum_line,color=i.color,alpha=0.8,linestyle=:solid)
+            lines!(ax_contrem,i.λ,continuum_removed,color=i.color,linewidth=SPECTRAL_LINE_WIDTH,linestyle=:solid)
         end
         display(GLMakie.Screen(),f_contrem)
     end
-    return nothing
+    return ax_contrem
 end
 
-function activate_save_buttons!(parent::GridPosition,sc::SpectraCollection)::Nothing
+function activate_save_buttons!(parent_figure::Figure,parent_position::GridLayout,collect_axis::Axis,contrem_axis::Axis,image_axis::Axis,sc::SpectraCollection)::Nothing
+    b1 = parent_position[1,1] = Button(parent_figure,label="Save Collection")
+    b2 = parent_position[1,2] = Button(parent_figure,label="Save Continuum Removal")
+    b3 = parent_position[1,3] = Button(parent_figure,label="Save Image")
+    txt = Textbox(parent_position[1,4],placeholder="Enter Save Name...",tellheight=false,tellwidth=false)
+    
+    savename = txt.stored_string
+
+    on(b1.clicks) do butt
+        filepath = open_dialog_native("Select Directory to Save Spectra", action=GtkFileChooserAction.SELECT_FOLDER)
+        export_spectra(collect_axis,filepath,savename=savename[],sc)
+    end
+
+    on(b2.clicks) do butt
+        filepath = open_dialog_native("Select Directory to Save Spectra", action=GtkFileChooserAction.SELECT_FOLDER)
+        export_spectra(contrem_axis,filepath,savename=savename[],sc)
+    end
+
+    on(b3.clicks) do butt
+        filepath = open_dialog_native("Select Directory to Save Spectra", action=GtkFileChooserAction.SELECT_FOLDER)
+        export_image(image_axis,filepath,savename=savename[])
+    end
     return nothing
 end
 
@@ -220,7 +209,9 @@ function spectrum_visualizer(
     register_interaction!(image_axis,:speccollect,sc)
 
     bg1 = svl.buttongrid[1,1] = GridLayout()
-    activate_spectral_operations!(f,bg1,collection_axis,image_axis,sc)
+    bg2 = svl.buttongrid[1,2] = GridLayout()
+    contrem_axis = activate_spectral_operations!(f,bg2,collection_axis,sc)
+    activate_save_buttons!(f,bg1,collection_axis,contrem_axis,image_axis,sc)
     # activate_toggles!(svl.spectrumgrid[1,4],sc)
     current_name = custom_name_box(svl.legendgrid[2,1])
 
@@ -230,7 +221,7 @@ function spectrum_visualizer(
             for i in ss.current_plot delete!(spectrum_axis,i) end
         end
         current_spec = arr[ob[1],ob[2],:]
-        l = lines!(spectrum_axis,λ,current_spec,color=:black)
+        l = lines!(spectrum_axis,λ,current_spec,color=:black,linewidth=SPECTRAL_LINE_WIDTH)
         autolimits!(spectrum_axis)
         ss.current_spectrum = current_spec
         push!(ss.current_plot,l)

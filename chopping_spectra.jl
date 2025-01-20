@@ -13,4 +13,6 @@ h5open("C:/SelenoSpecData/M3_data/gruit/region_showrtwvls.hdf5","w") do f
             end
         end
     end
+
+    attrs(f)["wavelengths"] = attrs(h5)["wavelengths"][1:71]
 end
