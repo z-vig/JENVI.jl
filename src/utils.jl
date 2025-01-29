@@ -34,7 +34,7 @@ end
 
 Given a list of wavelengths, `λ`, find the index of a `targetλ` and the actual wavelength closest to your target.
 """
-function findλ(λ::Vector{Float64},targetλ::Real)::Tuple{Int,Float64}
+function findλ(λ::Vector{T},targetλ::Real)::Tuple{Int,Float64} where {T<:AbstractFloat}
     idx = argmin(abs.(λ .- targetλ))
     return (idx,λ[idx])
 end
@@ -63,19 +63,20 @@ end
 #     end
 # end
 
-function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Matrix{Float32},Vector{Float32}}
+function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Vector{Float32}},Vector{Float32}}
     name_vec = Vector{String}(undef,0)
     plot_wavelengths = Vector{Float32}(src.scene.plots[1].args[1][])
     nbands = length(plot_wavelengths)
-    plot_data = Matrix{Float32}(undef,0,nbands)
+    plot_data = Vector{Vector{Float32}}(undef,0)
     
     for pl in src.scene.plots
         x = pl.args[1][]
         y = pl.args[2][]
+        println(length(x)," ",length(y))
         lines!(dst,x,y,color=pl.color,linestyle=pl.linestyle,linewidth=pl.linewidth)
         name = string(pl.color[],"_",pl.linestyle[])
         push!(name_vec,name)
-        plot_data = cat(plot_data,y',dims=1)
+        push!(plot_data,y)
     end
     return name_vec,plot_data,plot_wavelengths
 end
@@ -99,4 +100,14 @@ function copy_image_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Tupl
     end
 
     return name_list,pt_list
+end
+
+function get_mean_spectrum(spectra_data::Vector{SpectrumData})::Vector{Float32}
+    N = length(spectra_data)
+    μ = (1/N)*sum([i.data for i in spectra_data])
+    return μ
+end
+
+function get_mean_xy(spectra_data::Vector{SpectrumData})::Tuple{Vector{Int},Vector{Int}}
+    return ([i.xpixel for i in spectra_data],[i.ypixel for i in spectra_data])
 end

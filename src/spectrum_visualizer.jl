@@ -9,9 +9,8 @@ Average Current Collection (a)
 
 const SPECTRAL_ASPECT_RATIO = 5/4
 const SPECTRAL_LINE_WIDTH = 3
-const SMOOTHING_KERNEL_SIZE = 7
 
-SPECTRAL_PLOT_COLORMAP = distinguishable_colors(12, [RGB(1,0,0), RGB(0,1,0), RGB(0,0,1)], dropseed=false)
+SPECTRAL_PLOT_COLORMAP = distinguishable_colors(15, [RGB(1,0,0), RGB(0,1,0), RGB(0,0,1)], dropseed=false)
 
 GLMakie.activate!()
 
@@ -61,28 +60,61 @@ function plot_spectrum_data!(imax::Axis,specax::Axis,sd::SpectrumData)::Nothing
 end
 
 function activate_spectral_operations!(parent_figure::Figure,parent_position::GridLayout,collect_axis::Axis,sc::SpectraCollection) :: Axis
-    b1 = parent_position[1,1] = Button(parent_figure,label="Smooth Spectra",tellwidth=false)
+    tog1_grid = parent_position[1,1] = GridLayout()
+    tog1 = Toggle(tog1_grid[1,1],tellwidth=false)
+    kernelsize_slider = Slider(tog1_grid[2,1:2],tellwidth=false,tellheight=false,range=3:2:21,startvalue=9)
+    Label(tog1_grid[1,2],@lift(string("Kernel Size: ",$(kernelsize_slider.value))),tellwidth=false)
     b2 = parent_position[1,2] = Button(parent_figure,label="Remove Continuum")
-    tog_gp = parent_position[1,3] = GridLayout()
-    colsize!(parent_position,3,100)
+    # colsize!(parent_position,3,100)
     # l1 = Label(tog_gp[1,1],"New Plot?",tellheight=false,tellwidth=false)
     # t1 = Toggle(tog_gp[1,2],tellheight=false,tellwidth=false)
 
-    on(b1.clicks) do butt
-        for i in sc.spectra
-            lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.6)
-            i.data[],σ = moving_avg(i.data[],box_size = SMOOTHING_KERNEL_SIZE)
+    smoothed_data = Vector{Observable}(undef,0)
+    smoothed_data_λ = Vector{Observable}(undef,0)
+    on(tog1.active) do butt
+        if butt
+            empty!(collect_axis)
+            for i in sc.spectra
+                lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.4)
+                mavg_res = @lift(moving_avg(i.data[],box_size = $(kernelsize_slider.value),fill_ends=false)) #First index is smoothed data, second is standard deviation, third is valid indices
+                plotx = Observable(Vector{Float32}(undef,0))
+                ploty = Observable(Vector{Float32}(undef,0))
+                on(mavg_res) do ob
+                    plotx.val = i.λ[mavg_res[][3]]
+                    ploty[] = mavg_res[][1]
+                end
+                lines!(collect_axis,plotx,ploty,color=i.color,linestyle=:solid,alpha=1.0)
+                notify(mavg_res)
+                push!(smoothed_data,ploty)
+                push!(smoothed_data_λ,plotx)
+            end
+        elseif !butt
+            empty!(collect_axis)
+            smoothed_data = Vector{Observable}(undef,0)
+            smoothed_data_λ = Vector{Observable}(undef,0)
+            for i in sc.spectra
+                lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:solid,alpha=1.0)
+            end
         end
     end
 
     f_contrem = Figure(fonts = (; regular="Verdana",bold="Verdana Bold")); ax_contrem = Axis(f_contrem[1,1])
     on(b2.clicks) do butt
+        empty!(ax_contrem)
         format_continuum_removed!(ax_contrem)
         xlims!(extrema(sc.spectra[1].λ)...)
-        for i in sc.spectra
-            continuum_line,continuum_removed = double_line_removal(i.λ.*1000,i.data[])
-            lines!(collect_axis,i.λ,continuum_line,color=i.color,alpha=0.8,linestyle=:solid)
-            lines!(ax_contrem,i.λ,continuum_removed,color=i.color,linewidth=SPECTRAL_LINE_WIDTH,linestyle=:solid)
+        for (i,j,k) in zip(sc.spectra,smoothed_data,smoothed_data_λ)
+            contrem_λ = Observable(Vector{Float32}(undef,0))
+            contrem_y = Observable(Vector{Float32}(undef,0))
+            on(j) do ob
+                contrem_y.val = ob
+                contrem_λ[] = k[].*1000
+                autolimits!(ax_contrem)
+            end
+            notify(j)
+            dlr_result = @lift(double_line_removal($contrem_λ,$contrem_y)) #First index is the continuum line, second is the continuum removed spectrum
+            lines!(collect_axis,k,@lift($dlr_result[1]),color=i.color,alpha=0.8,linestyle=:solid)
+            lines!(ax_contrem,k,@lift($dlr_result[2]),color=i.color,linewidth=SPECTRAL_LINE_WIDTH,linestyle=:solid)
         end
         display(GLMakie.Screen(),f_contrem)
     end
@@ -129,10 +161,18 @@ end
 
 function Makie.process_interaction(interaction::Union{SpectraSearch,SpectraCollection}, event::KeysEvent, axis)
 
+    #Activates spectral selection
     if Makie.Keyboard.m in event.keys
         interaction.active[] = true
     elseif Makie.Keyboard.l in event.keys
         interaction.active[] = false
+    end
+
+    #Activates spectral averaging
+    if Makie.Keyboard.a in event.keys && interaction.active[]
+        interaction.averaging[] = true
+    elseif Makie.Keyboard.s in event.keys && interaction.active[]
+        interaction.averaging[] = false
     end
 
     if Makie.Keyboard.right in event.keys && typeof(interaction) == SpectraCollection
@@ -155,14 +195,6 @@ function Makie.process_interaction(interaction::SpectraSearch, event::MouseEvent
         end
     end
 end
-
-# function Makie.process_interaction(interaction::SpectraCollection, event::MouseEvent,axis)
-#     if to_value(interaction.active)
-#         if event.type == MouseEventTypes.leftdoubleclick
-#             interaction.collect_number[] += 1
-#         end
-#     end
-# end
 
 """
     spectrum_visualizer()
@@ -236,25 +268,92 @@ function spectrum_visualizer(
         else
             name = "spectrum$(to_value(ob))"
         end
-        current_specdata = SpectrumData(
-            λ,Observable(ss.current_spectrum),
-            name,
-            SPECTRAL_PLOT_COLORMAP[to_value(ob)],
-            ss.current_plot[1],
-            to_value(ss.selected_tracker)...,
-            LineElement(color=SPECTRAL_PLOT_COLORMAP[to_value(ob)],label=name)
-            )
 
-        push!(sc.spectra,current_specdata)
+        if !sc.averaging[]
+            current_specdata = SpectrumData(
+                λ,Observable(ss.current_spectrum),
+                name,
+                SPECTRAL_PLOT_COLORMAP[to_value(ob)],
+                ss.current_plot[1],
+                to_value(ss.selected_tracker)...,
+                LineElement(color=SPECTRAL_PLOT_COLORMAP[to_value(ob)],label=name)
+                )
 
-        scatter!(image_axis,current_specdata.xpixel,current_specdata.ypixel,color=current_specdata.color,strokewidth=2,strokecolor=:black)
-        lines!(collection_axis,current_specdata.λ,current_specdata.data,color=current_specdata.color,label=current_specdata.name)
-        autolimits!(collection_axis)
+            push!(sc.spectra,current_specdata)
 
-        leg_entry = LegendEntry([current_specdata.legend_entry],current_specdata.legend_entry.attributes)
-        push!(collection_legend.entrygroups[][1][2],leg_entry)
-        notify(collection_legend.entrygroups)
-        @debug "SpectraCollection length: " length(sc.spectra)
+            scatter!(image_axis,current_specdata.xpixel,current_specdata.ypixel,color=current_specdata.color,strokewidth=2,strokecolor=:black)
+            lines!(collection_axis,current_specdata.λ,current_specdata.data,color=current_specdata.color,label=current_specdata.name)
+            autolimits!(collection_axis)
+
+            leg_entry = LegendEntry([current_specdata.legend_entry],current_specdata.legend_entry.attributes)
+            push!(collection_legend.entrygroups[][1][2],leg_entry)
+            notify(collection_legend.entrygroups)
+            @debug "SpectraCollection length: " length(sc.spectra)
+
+        elseif sc.averaging[]
+            sc.collect_number.val -= 1
+            ob-=1
+
+            partofmean = SpectrumData(
+                λ,Observable(ss.current_spectrum),
+                name,
+                SPECTRAL_PLOT_COLORMAP[to_value(ob)],
+                ss.current_plot[1],
+                to_value(ss.selected_tracker)...,
+                LineElement(color=SPECTRAL_PLOT_COLORMAP[to_value(ob)],label=name)
+                )
+            push!(sc.temp_mean_collection[],partofmean)
+            notify(sc.temp_mean_collection)
+
+            scatter!(image_axis,partofmean.xpixel,partofmean.ypixel,color=partofmean.color,strokewidth=2,strokecolor=:black)
+
+            @info("($(partofmean.xpixel),$(partofmean.ypixel)) added to current mean ($(length(sc.temp_mean_collection[])) spectra.)")
+
+
+        end
+    end
+
+    #Observable function to handle spectral averaging
+    on(ss.averaging) do ob
+        #Sets averaging indicator as a red border around the collection axis
+        if ob && !isempty(sc.spectra)
+            if isempty(sc.temp_mean_collection[])
+                delete!(collection_axis,collection_axis.scene.plots[end])
+
+                startofmean = sc.spectra[end] #Starting the mean Vector
+                push!(sc.temp_mean_collection[],startofmean)
+                mean_spectrum = MeanSpectrum(
+                    λ,
+                    @lift([i.data[] for i in $(sc.temp_mean_collection)]),
+                    startofmean.name,
+                    startofmean.color,
+                    @lift([i.xpixel for i in $(sc.temp_mean_collection)]),
+                    @lift([i.ypixel for i in $(sc.temp_mean_collection)]),
+                    startofmean.legend_entry
+                )  
+
+                mean_data = @lift(mean($(mean_spectrum.data)))
+
+                lines!(collection_axis,mean_spectrum.λ,mean_data,color=mean_spectrum.color,label=mean_spectrum.name)
+
+                collection_axis.rightspinecolor = :red
+                collection_axis.leftspinecolor = :red
+                collection_axis.topspinecolor = :red
+                collection_axis.bottomspinecolor = :red
+            else
+                @warn "End the current mean collection first (press s)!"
+            end
+
+
+        elseif !ob && !isempty(sc.spectra)
+            collection_axis.rightspinecolor = :black
+            collection_axis.leftspinecolor = :black
+            collection_axis.topspinecolor = :black
+            collection_axis.bottomspinecolor = :black
+            sc.temp_mean_collection = Observable(Vector{SpectrumData}(undef,0))
+        else
+            println("Put at least one spectrum in your collection!")
+        end
     end
 
     adjust_parent_fig_sv(f,svl)

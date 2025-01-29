@@ -58,7 +58,7 @@ end
 
 function adjust_parent_fig_cube(parent_figure::Figure) :: Nothing
     rowsize!(parent_figure.layout,1,Relative(5/7)) #Main Image Axis
-    rowsize!(parent_figure.layout,2,Relative(1/10)) #Hsitogram Axis
+    # rowsize!(parent_figure.layout,2,Relative(1/10)) #Hsitogram Axis
 end
 
 function adjust_parent_fig_rgb(parent_figure::Figure) :: Nothing
@@ -84,7 +84,6 @@ function activate_color_range_selector!(isl::IntervalSlider,imdata::ImageCubeDat
 end
 
 function band_selector(parent_figure::Figure,parent_position::GridPosition,imdata::ImageCubeData) :: ButtonSelector
-    println()
     b1 = parent_position[1,1] = Button(parent_figure,label="First Band")
     b2 = parent_position[1,2] = Button(parent_figure,label="Decrease Band")
     b3 = parent_position[1,3] = Button(parent_figure,label="Increase Band")
@@ -151,7 +150,7 @@ end
 -`color_map`: color map to display the data in
 `flip_image`: Boolean for whether or not to flip the image on the y-axis. Often needed when reading from HDF5
 """
-function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image=false) :: Figure where {T<:AbstractH5ImageLocation}
+function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image::Bool=false, markbadvals::Bool=false, axis_title::String="Image Axis") :: Figure where {T<:AbstractH5ImageLocation}
     arr,lbls = h52arr(h5loc)
     if flip_image arr = arr[:,end:-1:1,:]; @debug "image_visualizer has flipped the image." end
 
@@ -160,7 +159,7 @@ function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image
     band = Observable(band)
 
     if typeof(h5loc) == H5cube
-        adjust_parent_fig(f)
+        adjust_parent_fig_cube(f)
 
         if isnothing(band) println("Set the band!") end
 
@@ -169,6 +168,7 @@ function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image
         imdata = ImageCubeData(im_array = arr, λ=lbls, selected_band=band,color_map=color_map)
 
         image_axis = get_image_axis(ivl.imagegrid[1,1])
+        image_axis.title = axis_title
 
         bs = band_selector(f,ivl.buttongrid[1,1],imdata)
         activate_band_selector!(bs,imdata)
@@ -178,8 +178,12 @@ function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image
     
         hga = band_histogram(ivl.histogramgrid,imdata)
         activate_band_histogram!(hga,imdata)
-    
-        image!(image_axis,imdata.display_matrix,colorrange=imdata.color_range,interpolate=false)
+        
+        if markbadvals
+            image!(image_axis,imdata.display_matrix,colorrange=(0,1),lowclip=:blue,highclip=:red,interpolate=false)
+        else
+            image!(image_axis,imdata.display_matrix,colorrange=imdata.color_range,interpolate=false)
+        end
     end
 
     if typeof(h5loc) == H5rgb
@@ -211,7 +215,6 @@ function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image
         rgb_multiply(x,y) = x ⊙ y
 
         rgb = @lift(mult_rgb.($rgb, $brightness_color))
-        println(typeof(rgb))
         rgb[][isnan.(rgb[])] .= RGBA(0.0,0.0,0.0,0.0)
         on(rgb) do ob
             rgb[][isnan.(rgb[])] .= RGBA(0.0,0.0,0.0,0.0)

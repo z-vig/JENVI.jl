@@ -1,4 +1,4 @@
-function moving_avg(spectrum::Vector{<:AbstractFloat};box_size=5)
+function moving_avg(spectrum::Vector{<:AbstractFloat};box_size=5,fill_ends::Bool=true)
     if iseven(box_size)
         println("box_size must be even!")
     end
@@ -9,13 +9,20 @@ function moving_avg(spectrum::Vector{<:AbstractFloat};box_size=5)
     μ² = conv(spectrum.^2,box)[begin+endcap:end-endcap] ./ box_size
 
     σ = sqrt.(μ² .- μ.^2)
-    
-    μ[begin:begin+endcap] = spectrum[begin:begin+endcap]
-    μ[end-endcap:end] = spectrum[end-endcap:end]
+
+    idx = 1:length(spectrum)
+
+    if fill_ends
+        μ[begin:begin+endcap] = spectrum[begin:begin+endcap]
+        μ[end-endcap:end] = spectrum[end-endcap:end]
+    else
+        μ = μ[begin+endcap:end-endcap]
+        idx = 1+endcap:length(spectrum)-endcap
+    end
 
     σ[begin:begin+endcap] .= 0
     σ[end-endcap:end] .= 0
-    return μ,σ
+    return μ,σ,idx
 end
 
 # using HDF5

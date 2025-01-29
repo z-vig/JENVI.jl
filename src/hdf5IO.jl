@@ -97,7 +97,7 @@ function export_spectra(ax::Axis,save_folder::String,sc::SpectraCollection;saven
     h5open("$(savestring)_data.hdf5","w") do f
         for (n,name) ∈ enumerate(names)
             # println(typeof(plot_data[n,:]))
-            f[name] = plot_data[n,:]
+            f[name] = plot_data[n]
         end
     end
     GLMakie.activate!()
