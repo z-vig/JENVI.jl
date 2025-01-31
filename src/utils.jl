@@ -63,10 +63,9 @@ end
 #     end
 # end
 
-function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Vector{Float32}},Vector{Float32}}
-    name_vec = Vector{String}(undef,0)
-    plot_wavelengths = Vector{Float32}(src.scene.plots[1].args[1][])
-    nbands = length(plot_wavelengths)
+function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Vector{Float32}},Vector{Vector{Float32}}}
+    label_vec = Vector{String}(undef,0)
+    plot_wavelengths = Vector{Vector{Float32}}(undef,0)
     plot_data = Vector{Vector{Float32}}(undef,0)
     
     for pl in src.scene.plots
@@ -74,11 +73,13 @@ function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{V
         y = pl.args[2][]
         println(length(x)," ",length(y))
         lines!(dst,x,y,color=pl.color,linestyle=pl.linestyle,linewidth=pl.linewidth)
-        name = string(pl.color[],"_",pl.linestyle[])
-        push!(name_vec,name)
+        println(pl.color)
+        lbl = string(pl.label[])
+        push!(label_vec,lbl)
         push!(plot_data,y)
+        push!(plot_wavelengths,x)
     end
-    return name_vec,plot_data,plot_wavelengths
+    return label_vec,plot_data,plot_wavelengths
 end
 
 function copy_image_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Tuple}}
@@ -87,7 +88,7 @@ function copy_image_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Tupl
     for pl in src.scene.plots
         if typeof(pl) <: Image
             imdata = src.scene.plots[1].args[1][]
-            println(any(isnan.(imdata)))
+            # println(any(isnan.(imdata)))
             image!(dst,imdata,interpolate=false)
         elseif typeof(pl) <: Scatter
             pt = (pl.args[1][],pl.args[2][])

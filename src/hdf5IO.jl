@@ -84,7 +84,8 @@ function export_spectra(ax::Axis,save_folder::String,sc::SpectraCollection;saven
     f = Figure(fonts = (; regular="Verdana",bold="Verdana Bold"),backgroundcolor=:transparent)
     save_axis = Axis(f[1,1],backgroundcolor=:transparent)
     format_regular!(save_axis)
-    colors,plot_data,λ = copy_spectral_axis!(ax,save_axis)
+    lbls,plot_data,λ = copy_spectral_axis!(ax,save_axis)
+
     names = [i.name for i in sc.spectra]
 
     if isnothing(savename)
@@ -95,9 +96,8 @@ function export_spectra(ax::Axis,save_folder::String,sc::SpectraCollection;saven
     CairoMakie.save("$savestring.svg",f)
 
     h5open("$(savestring)_data.hdf5","w") do f
-        for (n,name) ∈ enumerate(names)
-            # println(typeof(plot_data[n,:]))
-            f[name] = plot_data[n]
+        for (n,i) ∈ enumerate(lbls)
+            f[i] = plot_data[n]
         end
     end
     GLMakie.activate!()

@@ -75,7 +75,7 @@ function activate_spectral_operations!(parent_figure::Figure,parent_position::Gr
         if butt
             empty!(collect_axis)
             for i in sc.spectra
-                lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.4)
+                lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.4,label=i.name)
                 mavg_res = @lift(moving_avg(i.data[],box_size = $(kernelsize_slider.value),fill_ends=false)) #First index is smoothed data, second is standard deviation, third is valid indices
                 plotx = Observable(Vector{Float32}(undef,0))
                 ploty = Observable(Vector{Float32}(undef,0))
@@ -83,7 +83,7 @@ function activate_spectral_operations!(parent_figure::Figure,parent_position::Gr
                     plotx.val = i.λ[mavg_res[][3]]
                     ploty[] = mavg_res[][1]
                 end
-                lines!(collect_axis,plotx,ploty,color=i.color,linestyle=:solid,alpha=1.0)
+                lines!(collect_axis,plotx,ploty,color=i.color,linestyle=:solid,alpha=1.0,label=string(i.name,"_smooth"))
                 notify(mavg_res)
                 push!(smoothed_data,ploty)
                 push!(smoothed_data_λ,plotx)
@@ -93,7 +93,7 @@ function activate_spectral_operations!(parent_figure::Figure,parent_position::Gr
             smoothed_data = Vector{Observable}(undef,0)
             smoothed_data_λ = Vector{Observable}(undef,0)
             for i in sc.spectra
-                lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:solid,alpha=1.0)
+                lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:solid,alpha=1.0,label=i.name)
             end
         end
     end
@@ -113,8 +113,8 @@ function activate_spectral_operations!(parent_figure::Figure,parent_position::Gr
             end
             notify(j)
             dlr_result = @lift(double_line_removal($contrem_λ,$contrem_y)) #First index is the continuum line, second is the continuum removed spectrum
-            lines!(collect_axis,k,@lift($dlr_result[1]),color=i.color,alpha=0.8,linestyle=:solid)
-            lines!(ax_contrem,k,@lift($dlr_result[2]),color=i.color,linewidth=SPECTRAL_LINE_WIDTH,linestyle=:solid)
+            lines!(collect_axis,k,@lift($dlr_result[1]),color=i.color,alpha=0.8,linestyle=:solid,label=string(i.name,"_continuum"))
+            lines!(ax_contrem,k,@lift($dlr_result[2]),color=i.color,linewidth=SPECTRAL_LINE_WIDTH,linestyle=:solid,label=string(i.name,"_contrem"))
         end
         display(GLMakie.Screen(),f_contrem)
     end
@@ -281,8 +281,7 @@ function spectrum_visualizer(
 
             push!(sc.spectra,current_specdata)
 
-            scatter!(image_axis,current_specdata.xpixel,current_specdata.ypixel,color=current_specdata.color,strokewidth=2,strokecolor=:black)
-            lines!(collection_axis,current_specdata.λ,current_specdata.data,color=current_specdata.color,label=current_specdata.name)
+            plot_spectrum_data!(image_axis,collection_axis,current_specdata)
             autolimits!(collection_axis)
 
             leg_entry = LegendEntry([current_specdata.legend_entry],current_specdata.legend_entry.attributes)
@@ -340,6 +339,7 @@ function spectrum_visualizer(
                 collection_axis.leftspinecolor = :red
                 collection_axis.topspinecolor = :red
                 collection_axis.bottomspinecolor = :red
+                push!(sc.spectra,mean_spectrum)
             else
                 @warn "End the current mean collection first (press s)!"
             end
@@ -351,6 +351,7 @@ function spectrum_visualizer(
             collection_axis.topspinecolor = :black
             collection_axis.bottomspinecolor = :black
             sc.temp_mean_collection = Observable(Vector{SpectrumData}(undef,0))
+            
         else
             println("Put at least one spectrum in your collection!")
         end
