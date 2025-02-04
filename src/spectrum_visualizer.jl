@@ -73,10 +73,12 @@ function activate_spectral_operations!(parent_figure::Figure,parent_position::Gr
     smoothed_data_λ = Vector{Observable}(undef,0)
     on(tog1.active) do butt
         if butt
+
             empty!(collect_axis)
             for i in sc.spectra
+                println(typeof(i),typeof(i.data[]))
                 lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.4,label=i.name)
-                mavg_res = @lift(moving_avg(i.data[],box_size = $(kernelsize_slider.value),fill_ends=false)) #First index is smoothed data, second is standard deviation, third is valid indices
+                mavg_res = @lift(moving_avg(i.data[],box_size = $(kernelsize_slider.value),edge_handling="extrapolate")) #First index is smoothed data, second is standard deviation, third is valid indices
                 plotx = Observable(Vector{Float32}(undef,0))
                 ploty = Observable(Vector{Float32}(undef,0))
                 on(mavg_res) do ob
@@ -329,17 +331,27 @@ function spectrum_visualizer(
                     @lift([i.xpixel for i in $(sc.temp_mean_collection)]),
                     @lift([i.ypixel for i in $(sc.temp_mean_collection)]),
                     startofmean.legend_entry
-                )  
+                )
 
                 mean_data = @lift(mean($(mean_spectrum.data)))
 
-                lines!(collection_axis,mean_spectrum.λ,mean_data,color=mean_spectrum.color,label=mean_spectrum.name)
+                p = lines!(collection_axis,mean_spectrum.λ,mean_data,color=mean_spectrum.color,label=mean_spectrum.name)
 
                 collection_axis.rightspinecolor = :red
                 collection_axis.leftspinecolor = :red
                 collection_axis.topspinecolor = :red
                 collection_axis.bottomspinecolor = :red
-                push!(sc.spectra,mean_spectrum)
+                pop!(sc.spectra)
+                push!(sc.spectra,SpectrumData(
+                    mean_spectrum.λ,
+                    mean_data,
+                    mean_spectrum.name,
+                    mean_spectrum.color,
+                    p,
+                    mean(mean_spectrum.xpixels[]),
+                    mean(mean_spectrum.ypixels[]),
+                    mean_spectrum.legend_entry
+                ))
             else
                 @warn "End the current mean collection first (press s)!"
             end
@@ -351,7 +363,6 @@ function spectrum_visualizer(
             collection_axis.topspinecolor = :black
             collection_axis.bottomspinecolor = :black
             sc.temp_mean_collection = Observable(Vector{SpectrumData}(undef,0))
-            
         else
             println("Put at least one spectrum in your collection!")
         end
