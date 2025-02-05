@@ -2,7 +2,7 @@ using HDF5
 
 h5 = h5open("C:/SelenoSpecData/M3_data/targeted/hdf5_files/new_mosaic.hdf5")
 
-h5open("C:/SelenoSpecData/M3_data/targeted/mosaic_showrtwvls.hdf5","w") do f
+h5open("C:/SelenoSpecData/M3_data/targeted/hdf5_files/mosaic_showrtwvls.hdf5","w") do f
     for group in keys(h5)
         for ds in keys(h5[group])
             name = "$group/$ds"

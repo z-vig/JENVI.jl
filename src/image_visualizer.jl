@@ -27,12 +27,30 @@ Stores pertinent data from an image cube representing spectral data
     color_range::Observable{Tuple{<:AbstractFloat,<:AbstractFloat}} = @lift(extrema($finite_data))
 end
 
+@kwdef mutable struct ImageRasterData
+    im_array::Matrix{<:AbstractFloat}
+    λ::Vector{<:AbstractFloat}
+    color_map::Symbol
+    display_matrix::Observable{Matrix{<:AbstractFloat}} = Observable(im_array)
+    display_mask::Observable{BitMatrix} = @lift(isfinite.($display_matrix))
+    finite_data::Observable{Vector{<:AbstractFloat}} = @lift($display_matrix[$display_mask])
+    histogram::Observable{StatsBase.Histogram} = @lift(StatsBase.fit(Histogram,$finite_data,nbins=100))
+    color_range::Observable{Tuple{<:AbstractFloat,<:AbstractFloat}} = @lift(extrema($finite_data))
+end
+
 @kwdef mutable struct ImageCubeLayout
     parent_figure::Figure
     imagegrid::GridLayout = parent_figure[1,1] = GridLayout()
     histogramgrid::GridLayout = parent_figure[2,1] = GridLayout()
     slidergrid::GridLayout = parent_figure[3,1] = GridLayout()
     buttongrid::GridLayout = parent_figure[4,1] = GridLayout()
+end
+
+@kwdef mutable struct ImageRasterLayout
+    parent_figure::Figure
+    imagegrid::GridLayout = parent_figure[1,1] = GridLayout()
+    histogramgrid::GridLayout = parent_figure[2,1] = GridLayout()
+    slidergrid::GridLayout = parent_figure[3,1] = GridLayout()
 end
 
 @kwdef mutable struct RGBLayout
@@ -72,13 +90,13 @@ function get_image_axis(parent_position::GridPosition)::Axis
     return image_axis
 end
 
-function color_range_selector(parent_position::GridPosition,imdata::ImageCubeData)::IntervalSlider
+function color_range_selector(parent_position::GridPosition,imdata::Union{ImageCubeData,ImageRasterData})::IntervalSlider
     r = @lift(range(extrema($(imdata.finite_data))...,100))
     isl = IntervalSlider(parent_position, range = r, tellwidth=true)
     return isl
 end
 
-function activate_color_range_selector!(isl::IntervalSlider,imdata::ImageCubeData)::Nothing
+function activate_color_range_selector!(isl::IntervalSlider,imdata::Union{ImageCubeData,ImageRasterData})::Nothing
     imdata.color_range = isl.interval
     return nothing
 end
@@ -123,7 +141,7 @@ function activate_band_selector!(bs::ButtonSelector,imdata::ImageCubeData)::Noth
     return nothing
 end
 
-function band_histogram(parent_position::GridLayout,imdata::ImageCubeData) :: Axis
+function band_histogram(parent_position::GridLayout,imdata::Union{ImageCubeData,ImageRasterData}) :: Axis
     histogram_axis = Axis(parent_position[1,1])
     on(imdata.finite_data) do o
         reset_limits!(histogram_axis)
@@ -131,13 +149,13 @@ function band_histogram(parent_position::GridLayout,imdata::ImageCubeData) :: Ax
     return histogram_axis
 end
 
-function activate_band_histogram!(hga::Axis,imdata::ImageCubeData) :: Nothing
+function activate_band_histogram!(hga::Axis,imdata::Union{ImageCubeData,ImageRasterData}) :: Nothing
     hist_colors = @lift([val > $(imdata.color_range)[1] && val < $(imdata.color_range)[2] ? :red : :transparent for val in $(imdata.histogram).edges[1]])
     hist!(hga,imdata.finite_data,bins=@lift(length($(hist_colors))),color=hist_colors,strokewidth=0.5,strokecolor=:black)
     return nothing
 end
 
-function band_colorbar(parent_position::GridLayout,imdata::ImageCubeData) :: Colorbar
+function band_colorbar(parent_position::GridLayout,imdata::Union{ImageCubeData,ImageRasterData}) :: Colorbar
     cbar = ColonBar(parent_position,limits=imdata.color_range,colormap=colormap)
 end
 
@@ -221,6 +239,29 @@ function image_visualizer(h5loc::T; band=nothing, color_map = :gray1, flip_image
         end
 
         image!(image_axis,rgb,interpolate=false)
+    end
+
+    if typeof(h5loc) == H5raster
+        adjust_parent_fig_cube(f)
+
+        irl = ImageRasterLayout(parent_figure = f)
+
+        imdata = ImageRasterData(im_array = arr[:,:,1], λ=lbls ,color_map=color_map)
+
+        image_axis = get_image_axis(irl.imagegrid[1,1])
+        image_axis.title = axis_title
+    
+        isl = color_range_selector(irl.slidergrid[1,1],imdata)
+        activate_color_range_selector!(isl,imdata)
+    
+        hga = band_histogram(irl.histogramgrid,imdata)
+        activate_band_histogram!(hga,imdata)
+        
+        if markbadvals
+            image!(image_axis,imdata.display_matrix,colorrange=(0,1),lowclip=:blue,highclip=:red,interpolate=false,nan_color=:grey)
+        else
+            image!(image_axis,imdata.display_matrix,colorrange=imdata.color_range,interpolate=false,nan_color=:grey)
+        end
     end
 
     # DataInspector(f)

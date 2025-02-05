@@ -28,7 +28,8 @@ export norm_im,
        img2h5,
        safe_add_to_h5,
        copy_spectral_axis!,
-       mult_rgb
+       mult_rgb,
+       make3d
 
 include("hdf5IO.jl")
 export H5cube,

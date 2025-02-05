@@ -50,19 +50,6 @@ function mult_rgb(x::RGBA,y::RGBA)
     return RGBA(mul_vec...)
 end
 
-# """
-#     img2h5(impath::String,h5loc::HDF5FileLocation)
-
-# Reads a .img or a .tif file at `impath` and writes it to the specified `h5loc`
-# """
-# function img2h5(impath::String,h5loc::)
-#     ds = AG.read(impath)
-#     arr = AG.read(ds)
-#     h5open(h5loc.path,"r+") do f
-#         safe_add_to_h5(f,h5loc.dat,arr)
-#     end
-# end
-
 function copy_spectral_axis!(src::Axis,dst::Axis)::Tuple{Vector{String},Vector{Vector{Float32}},Vector{Vector{Float32}}}
     label_vec = Vector{String}(undef,0)
     plot_wavelengths = Vector{Vector{Float32}}(undef,0)
@@ -111,4 +98,11 @@ end
 
 function get_mean_xy(spectra_data::Vector{SpectrumData})::Tuple{Vector{Int},Vector{Int}}
     return ([i.xpixel for i in spectra_data],[i.ypixel for i in spectra_data])
+end
+
+function make3d(im::Array{Vector{Float64},2})
+    """
+    A function for turning a Matrix{Vector{Float64}} to an Array{Float64,3}
+    """
+    return permutedims([im[I][k] for k=eachindex(im[1,1]),I=CartesianIndices(im)],(2,3,1))
 end

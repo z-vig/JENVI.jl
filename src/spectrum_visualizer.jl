@@ -62,7 +62,7 @@ end
 function activate_spectral_operations!(parent_figure::Figure,parent_position::GridLayout,collect_axis::Axis,sc::SpectraCollection) :: Axis
     tog1_grid = parent_position[1,1] = GridLayout()
     tog1 = Toggle(tog1_grid[1,1],tellwidth=false)
-    kernelsize_slider = Slider(tog1_grid[2,1:2],tellwidth=false,tellheight=false,range=3:2:21,startvalue=9)
+    kernelsize_slider = Slider(tog1_grid[2,1:2],tellwidth=false,tellheight=false,range=3:2:41,startvalue=9)
     Label(tog1_grid[1,2],@lift(string("Kernel Size: ",$(kernelsize_slider.value))),tellwidth=false)
     b2 = parent_position[1,2] = Button(parent_figure,label="Remove Continuum")
     # colsize!(parent_position,3,100)
@@ -78,7 +78,7 @@ function activate_spectral_operations!(parent_figure::Figure,parent_position::Gr
             for i in sc.spectra
                 println(typeof(i),typeof(i.data[]))
                 lines!(collect_axis,i.λ,i.data[],color=i.color,linestyle=:dash,alpha=0.4,label=i.name)
-                mavg_res = @lift(moving_avg(i.data[],box_size = $(kernelsize_slider.value),edge_handling="extrapolate")) #First index is smoothed data, second is standard deviation, third is valid indices
+                mavg_res = @lift(moving_avg(i.data[],box_size = $(kernelsize_slider.value),edge_handling="extrapolate",rm_outliers=true)) #First index is smoothed data, second is standard deviation, third is valid indices
                 plotx = Observable(Vector{Float32}(undef,0))
                 ploty = Observable(Vector{Float32}(undef,0))
                 on(mavg_res) do ob
