@@ -21,6 +21,7 @@ GLMakie.activate!()
 
 # =============================================================================
 # Including utilities, I/O functions and plotting formats
+include("visualizers/spectrum_visualizer_structs.jl")  # Used in utils.jl
 include("utils.jl")
 include("hdf5IO.jl")
 include("pretty_axes.jl")
@@ -43,15 +44,20 @@ export moving_avg, SAMEndmembers, SAM, double_line_removal, BandShapeParams,
 
 # =============================================================================
 # Including all visualizers
-include("visualizers/spectrum_visualizer_structs.jl")
 include("visualizers/image_visualizer.jl")
 include("visualizers/spectrum_visualizer.jl")
 include("visualizers/roi_visualizer.jl")
 include("visualizers/mixture_visualizer.jl")
-include("visualizers/mixture_visualizer.jl")
 include("visualizers/bandshape_visualizer.jl")
 export image_visualizer, spectrum_visualizer, roi_visualizer,
        mixture_visualizer, bandshape_visualizer
+# =============================================================================
+
+
+# =============================================================================
+# Including use case functions
+include("explore_cube.jl")
+export explore_cube
 # =============================================================================
 
 end #module
