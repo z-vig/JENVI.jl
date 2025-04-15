@@ -19,58 +19,39 @@ using Dates
 
 GLMakie.activate!()
 
-include("spectrum_visualizer_structs.jl")
-
+# =============================================================================
+# Including utilities, I/O functions and plotting formats
 include("utils.jl")
-export norm_im,
-       norm_im_controlled,
-       findλ,
-       img2h5,
-       safe_add_to_h5,
-       copy_spectral_axis!,
-       mult_rgb,
-       make3d
-
 include("hdf5IO.jl")
-export H5cube,
-       H5rgb,
-       H5raster,
-       h52arr,
-       export_spectra,
-       export_image
-
 include("pretty_axes.jl")
-export format_regular!,
-       format_continuum_removed!
+export norm_im, norm_im_controlled, findλ, img2h5, safe_add_to_h5,
+       copy_spectral_axis!, mult_rgb, make3d, H5cube, H5rgb, H5raster, h52arr,
+       export_spectra, export_image, format_regular!, format_continuum_removed!
+# =============================================================================
 
-include("image_visualizer.jl")
-export image_visualizer
 
-include("spectrum_visualizer.jl")
-export spectrum_visualizer
-
-include("roi_visualizer.jl")
-export roi_visualizer
-
-include("mixture_visualizer.jl")
-export mixture_visualizer
-
-include("bandshape_math.jl")
-export BandShapeParams,
-       banddepth,
-       bandposition
-
-include("bandshape_visualizer.jl")
-export bandshape_visualizer
-
-include("spectral_angle_map.jl")
-export SAMEndmembers,
-       SAM
-
+# =============================================================================
+# Including all spectral operations
+include("spectral_operations/bandshape_math.jl")
 include("spectral_operations/spectral_smoothing.jl")
-export moving_avg
-
 include("spectral_operations/continuum_removal.jl")
-export double_line_removal
+include("spectral_operations/spectral_angle_map.jl")
+export moving_avg, SAMEndmembers, SAM, double_line_removal, BandShapeParams,
+       banddepth, bandposition
+# =============================================================================
+
+
+# =============================================================================
+# Including all visualizers
+include("visualizers/spectrum_visualizer_structs.jl")
+include("visualizers/image_visualizer.jl")
+include("visualizers/spectrum_visualizer.jl")
+include("visualizers/roi_visualizer.jl")
+include("visualizers/mixture_visualizer.jl")
+include("visualizers/mixture_visualizer.jl")
+include("visualizers/bandshape_visualizer.jl")
+export image_visualizer, spectrum_visualizer, roi_visualizer,
+       mixture_visualizer, bandshape_visualizer
+# =============================================================================
 
 end #module
