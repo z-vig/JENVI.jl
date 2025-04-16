@@ -106,7 +106,7 @@ function activate_spectral_operations!(
         tog1_grid[2,1:2],
         tellwidth=false,
         tellheight=false,
-        range=3:2:41,
+        range=1:2:41,
         startvalue=9
     )
 
@@ -124,8 +124,8 @@ function activate_spectral_operations!(
     smoothed_data = Vector{Observable}(undef,0)
     smoothed_data_λ = Vector{Observable}(undef,0)
     on(tog1.active) do butt
-        if butt
 
+        if butt
             empty!(collect_axis)
             for i in sc.spectra
 
@@ -160,6 +160,7 @@ function activate_spectral_operations!(
                 notify(mavg_res)
                 push!(smoothed_data,ploty)
                 push!(smoothed_data_λ,plotx)
+                println(i.data[][20:30])
             end
         elseif !butt
             empty!(collect_axis)
@@ -169,10 +170,11 @@ function activate_spectral_operations!(
                 lines!(
                     collect_axis,
                     i.λ, i.data[],
-                    color=i.color, linestyle=:solid,
                     alpha=1.0, label=i.name
                 )
+                println(i.data[][20:30])
             end
+
         end
     end
 
@@ -224,7 +226,8 @@ function activate_save_buttons!(
     sc::SpectraCollection
 )::Nothing
     b1 = parent_position[1,1] = Button(parent_figure,label="Save Collection")
-    b2 = parent_position[1,2] = Button(parent_figure,label="Save Continuum Removal")
+    b2 = parent_position[1,2] = Button(parent_figure,
+                                       label="Save Continuum Removal")
     b3 = parent_position[1,3] = Button(parent_figure,label="Save Image")
     txt = Textbox(
         parent_position[1,4],
@@ -442,13 +445,14 @@ function spectrum_visualizer(
             ob-=1
 
             partofmean = SpectrumData(
-                λ,Observable(ss.current_spectrum),
-                name,
-                SPECTRAL_PLOT_COLORMAP[to_value(ob)],
+                λ, Observable(ss.current_spectrum),
+                name, SPECTRAL_PLOT_COLORMAP[to_value(ob)],
                 ss.current_plot[1],
                 to_value(ss.selected_tracker)...,
-                LineElement(color=SPECTRAL_PLOT_COLORMAP[to_value(ob)],label=name)
+                LineElement(
+                    color=SPECTRAL_PLOT_COLORMAP[to_value(ob)], label=name
                 )
+            )
             push!(sc.temp_mean_collection[],partofmean)
             notify(sc.temp_mean_collection)
 

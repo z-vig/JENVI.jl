@@ -35,11 +35,13 @@ Smooths the input spectrum using a moving average filter. The function returns t
     - "cut_ends": Cuts the ends of the spectrum.
 """
 function moving_avg(
-    spectrum::Vector{<:AbstractFloat};
+    spectrum_original::Vector{<:AbstractFloat};
     box_size::Int=5,
     edge_handling::String="extrapolate",
     rm_outliers::Bool=false
 ) :: Tuple{Vector{Float64},Vector{Float64},Vector{Int}}
+
+    spectrum = copy(spectrum_original)
 
     if iseven(box_size)
         println("box_size must be even!")

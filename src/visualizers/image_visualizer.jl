@@ -274,9 +274,11 @@ end
 # Arguments
 - `h5loc::H5FileLocation`: H5FileLocation object to display as an image
 - `band`: initial band of the data to display
-- `color_map`: color map to display the data in
-- `flip_image`: Boolean for whether or not to flip the image on the y-axis. 
-              Often needed when reading from HDF5.
+- `color_map`: Optional. Color map to display the data. Default is `:gray1`
+- `flip_image`: Optional. Boolean for whether or not to flip the image on the
+                y-axis. Often needed when reading from HDF5. Default is false.
+- `rgb_bounds`: Optional. R, G amd B band color ranges as tuples in a vector.
+                Default is `nothing`
 """
 function image_visualizer(
     h5loc::T;
@@ -284,8 +286,9 @@ function image_visualizer(
     color_map = :gray1,
     flip_image::Bool=false,
     markbadvals::Bool=false,
-    axis_title::String="Image Axis"
-) :: Figure where {T<:AbstractH5ImageLocation}
+    axis_title::String="Image Axis",
+    rgb_bounds::Union{Nothing, Vector{Tuple{R, R}}}=nothing
+) :: Figure where {T<:AbstractH5ImageLocation} where {R<:AbstractFloat}
 
     arr,lbls = h52arr(h5loc)
 
@@ -350,8 +353,17 @@ function image_visualizer(
 
         image_axis = get_image_axis(rgbl.imagegrid[1,1])
 
+        if isnothing(rgb_bounds)
+            rgb_bounds = [
+                extrema(red_real) .* 0.8,
+                extrema(green_real) .* 0.8,
+                extrema(blue_real) .* 0.8
+            ]
+        end
+
         sl_red = IntervalSlider(
-            rgbl.slidergrid[1,1], range=range(extrema(red_real)..., 500)
+            rgbl.slidergrid[1,1], range=range(extrema(red_real)..., 500),
+            startvalues=rgb_bounds[1]
         )
         red_label = Label(
             rgbl.slidergrid[2,1],
@@ -366,7 +378,8 @@ function image_visualizer(
         )
 
         sl_green = IntervalSlider(
-            rgbl.slidergrid[3,1], range=range(extrema(green_real)...,500)
+            rgbl.slidergrid[3,1], range=range(extrema(green_real)...,500),
+            startvalues=rgb_bounds[2]
         )
 
         green_label = Label(
@@ -382,7 +395,8 @@ function image_visualizer(
         )
 
         sl_blue = IntervalSlider(
-            rgbl.slidergrid[5,1], range=range(extrema(blue_real)..., 500)
+            rgbl.slidergrid[5,1], range=range(extrema(blue_real)..., 500),
+            startvalues=rgb_bounds[3]
         )
 
         blue_label = Label(

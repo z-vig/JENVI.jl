@@ -13,6 +13,9 @@ internal_hdf5_paths = Dict(
     :params_pds => "ScalarDatasets/PDSParameterSuite"
 )
 
+# RGB bounds for global_new gruithuisen region:
+# [(-0.28, 1.58), (0.01, 1.63), (0.09, 0.22)]
+
 "
     explore_cube(
         h5path::String,
@@ -32,13 +35,16 @@ Explore a spectral cube in an ENVI-like environment.
 - `rgb_bands::Vecotr{Int}`: Optional. If passed, must be a length 3 vector
                             where the three values are the the R, G and B bands
                             to display, respectively. Default is `nothing`.
+- `rgb_boundsVector{Tuple{T, T}}`: Optional. R, G amd B band color ranges as 
+                                   tuples in a vector. Default is `nothing`
 "
 function explore_cube(
     h5path::String,
     disp::Symbol,
     cube::Union{Symbol,Nothing}=nothing;
-    rgb_bands::Union{Vector{Int}, Nothing}=nothing  # [6, 3, 2] for params
-)
+    rgb_bands::Union{Vector{Int}, Nothing}=nothing,  # [6, 3, 2] for params
+    rgb_bounds::Union{Vector{Tuple{T, T}}, Nothing} = nothing
+) where {T<:AbstractFloat}
 
     if isnothing(cube)
         cube = disp
@@ -60,6 +66,6 @@ function explore_cube(
 
     cubeimg = H5cube(h5path, internal_hdf5_paths[cube], "wavelengths")
 
-    f = image_visualizer(dispimg; band=2, flip_image=true)
+    f = image_visualizer(dispimg; band=2, flip_image=true, rgb_bounds)
     spectrum_visualizer(f, cubeimg; flip_image=true)
 end
