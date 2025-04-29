@@ -286,7 +286,7 @@ function image_visualizer(
     color_map = :gray1,
     flip_image::Bool=false,
     markbadvals::Bool=false,
-    axis_title::String="Image Axis",
+    axis_title::Union{String, Vector{String}}="Image Axis",
     rgb_bounds::Union{Nothing, Vector{Tuple{R, R}}}=nothing
 ) :: Figure where {T<:AbstractH5ImageLocation} where {R<:AbstractFloat}
 
@@ -310,7 +310,14 @@ function image_visualizer(
         imdata = ImageCubeData(arr, lbls, band, color_map)
 
         image_axis = get_image_axis(ivl.imagegrid[1,1])
-        image_axis.title = axis_title
+        if axis_title isa String
+            image_axis.title = axis_title
+        else
+            title_string = @lift(axis_title[$band])
+            on(title_string) do t
+                image_axis.title = t
+            end
+        end
 
         bs = band_selector(f,ivl.buttongrid[1,1],imdata)
         activate_band_selector!(bs,imdata)

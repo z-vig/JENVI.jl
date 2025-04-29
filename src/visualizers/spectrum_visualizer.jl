@@ -160,7 +160,6 @@ function activate_spectral_operations!(
                 notify(mavg_res)
                 push!(smoothed_data,ploty)
                 push!(smoothed_data_λ,plotx)
-                println(i.data[][20:30])
             end
         elseif !butt
             empty!(collect_axis)
@@ -172,7 +171,6 @@ function activate_spectral_operations!(
                     i.λ, i.data[],
                     alpha=1.0, label=i.name
                 )
-                println(i.data[][20:30])
             end
 
         end
@@ -325,9 +323,13 @@ function Makie.process_interaction(
             pt = round.(Int,event.data)
             interaction.selected_tracker[] = pt
 
-            @info "Plotted Spectrum at ("
-                  "$(to_value(interaction.selected_tracker)[1]), "
-                  "$(to_value(interaction.selected_tracker)[2]))"
+            plot_spec_string = (
+                "Plotted Spectrum at ("*
+                "$(to_value(interaction.selected_tracker)[1]), "*
+                "$(to_value(interaction.selected_tracker)[2]))"
+            )
+            @info plot_spec_string
+
         end
     end
 end

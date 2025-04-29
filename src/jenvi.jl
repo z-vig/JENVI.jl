@@ -16,6 +16,8 @@ using Interpolations
 using LazySets
 using ColorVectorSpace
 using Dates
+using Distributions
+using ProgressMeter
 
 GLMakie.activate!()
 
@@ -57,7 +59,8 @@ export image_visualizer, spectrum_visualizer, roi_visualizer,
 # =============================================================================
 # Including use case functions
 include("explore_cube.jl")
-export explore_cube
+include("explore_SMA.jl")
+export explore_cube, explore_sma
 # =============================================================================
 
 end #module
