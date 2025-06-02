@@ -23,6 +23,7 @@ Holds file path information for an HDF5 rgb image composite
 
 # Fields
 - `path`: File path for the HDF5 file
+- `data`: Internal path to data
 - `red`: Band number to use for the red band image
 - `green`: Band number to use for the red band image
 - `blue`: Band number to use for the red band image

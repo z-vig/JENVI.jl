@@ -294,13 +294,12 @@ function bandshape_visualizer(
     h5loc::T;
     flip_image::Bool = false
 )  :: Nothing where {T<:AbstractH5ImageLocation}
-
     imcube,λ = h5open(h5loc.path) do f
         if flip_image
-            im = f[h5loc.data][:,:,:]
-            return im[:,end:-1:1,:],attrs(f)[h5loc.lbl]
+            im = f[h5loc.data][:, :, :]
+            return im[:, end:-1:1, :], attrs(f)[h5loc.lbl]
         else
-            return f[h5loc.data][:,:,:],attrs(f)[h5loc.lbl]
+            return f[h5loc.data][:, :, :], attrs(f)[h5loc.lbl]
         end
     end
 

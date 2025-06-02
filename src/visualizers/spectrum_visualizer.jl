@@ -147,6 +147,7 @@ function activate_spectral_operations!(
                 )
                 plotx = Observable(Vector{Float32}(undef,0))
                 ploty = Observable(Vector{Float32}(undef,0))
+
                 on(mavg_res) do ob
                     plotx.val = i.λ[mavg_res[][3]]
                     ploty[] = mavg_res[][1]
@@ -355,7 +356,7 @@ function spectrum_visualizer(
 ) :: Nothing where {T<:AbstractH5ImageLocation}
 
     #Loads in data from h5loc file
-    arr,λ = h52arr(h5loc)
+    arr, λ = h52arr(h5loc)
     λ = λ./1000
     #Flips the image along the y-axis
     if flip_image arr = arr[:,end:-1:1,:]

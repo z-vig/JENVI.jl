@@ -47,7 +47,11 @@ function double_line_removal(λ::Vector{<:AbstractFloat},spectrum::Vector{<:Abst
     cont2_wvls = λ[cont2_band_indices]
     cont2_spectrum_values = spectrum[cont2_band_indices]
 
-    lin_interp2 = linear_interpolation(cont2_wvls,cont2_spectrum_values,extrapolation_bc=Interpolations.Line())
+    lin_interp2 = linear_interpolation(
+        cont2_wvls,
+        cont2_spectrum_values,
+        extrapolation_bc=Interpolations.Line()
+    )
 
     cont2_complete = lin_interp2(λ)
 

@@ -1,5 +1,5 @@
 """
-    SAMEndmembers()
+    SAMEndmember()
 
 Stores endmembers for use in `SAM` function
 
@@ -7,12 +7,15 @@ Stores endmembers for use in `SAM` function
 - `data`: (NxM) Matrix of endmembers where N is number of endmembers and M is
 the number of spectral bands
 - `thresh`: Vector of endmember threshold values
-- `names`: Vector of endmember names
+- `coord`: Coordinate location in pixels of the spectrum
+- `name`: Vector of endmember names
 """
-struct SAMEndmembers{T<:AbstractFloat}
-    data::Matrix{T}
-    thresh::Vector{T}
-    names::Vector{String}
+struct SAMEndmember{T<:AbstractFloat}
+    data::Vector{T}
+    thresh::T
+    coord::Tuple{Int, Int}
+    name::String
+    color::Symbol
 end
 
 """
@@ -25,7 +28,7 @@ function cosine_dist(
     M::Vector{<:AbstractFloat},
     I::Vector{<:AbstractFloat}
 )::Float64
-    ca = M⋅I/(norm(M)*norm(I))
+    ca = M ⋅ I / (norm(M) * norm(I))
     if ca>1
         return NaN
     else
@@ -41,7 +44,7 @@ hyperspectral image `arr` and a set of `endmembers`.
 # Arguments
 - `arr::Array{T,3}`: A 3D hyperspectral data cube with dimensions 
   (rows, columns, bands), where `T` is a subtype of `AbstractFloat`.
-- `endmembers::SAMEndmembers`: A structure containing reference spectra 
+- `endmembers::Vector{SAMEndmember}`: A structure containing reference spectra 
   (endmembers), each of which is compared against every pixel spectrum.
 - `classify::Bool=false`: If `true`, returns a classified 2D image where each
 pixel is assigned the index of the closest matching endmember (based on a
@@ -74,35 +77,43 @@ classified_map = SAM(data_cube, endmembers; classify=true)
 "
 function SAM(
     arr::Array{T},
-    endmembers::SAMEndmembers;
+    endmembers::Vector{SAMEndmember};
     classify::Bool = false
 ) where {T<:AbstractFloat}
     # Makes `sam` a 3D array of spectral angle values, with the third dimension
     # being SAM values for each endmember.
     sam = Array{Float64,3}(
-        undef, size(arr, 1), size(arr, 2), size(endmembers.data, 1)
+        undef, size(arr, 1), size(arr, 2), length(endmembers)
     )
 
-    for (n, i) ∈ enumerate(eachrow(endmembers.data))
+    for (n, em) ∈ enumerate(endmembers)
         spec_angle = map(CartesianIndices(axes(arr)[1:2])) do c
             x,y = Tuple(c)
-            return cosine_dist(arr[x,y,:], Vector(i))
+            return cosine_dist(arr[x, y, :], em.data)
         end
         sam[:, :, n] .= spec_angle
     end
 
     if classify
+        classification_key = Dict(
+            i.name=>n+1
+            for (n, i)
+            in enumerate(endmembers) 
+        )
         sam_classified = map(CartesianIndices(axes(sam)[1:2])) do i
             x,y=Tuple(i)
-            if any(sam[x,y,:] .< 1.1)
-                return float(argmin(sam[x,y,:]))+1
-            elseif all(sam[x,y, :] .>= 1.1)
-                return 1.0
+            if all(isfinite.(sam[x, y, :]))
+                for (n, em) in enumerate(endmembers)
+                    if sam[x, y, n] < em.thresh
+                        return classification_key[em.name]
+                    end
+                end
+                return 1
             else
                 return NaN
             end
         end
-        return sam_classified
+        return sam_classified, classification_key
     else
         return sam
     end
@@ -127,7 +138,7 @@ computes the Spectral Angle Map (SAM) relative to the given endmembers.
 """
 function SAM(
     h5loc::T,
-    endmembers::SAMEndmembers;
+    endmembers::Vector{SAMEndmember};
     classify::Bool=false
 ) where {T<:AbstractH5ImageLocation}
     arr, λ = h52arr(h5loc)

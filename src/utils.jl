@@ -1,3 +1,8 @@
+# utils.jl
+
+using ColorSchemes
+using Colors
+
 function norm_im(arr::Matrix{<:AbstractFloat})
     real_arr = arr[isfinite.(arr)]
     return (arr .- minimum(real_arr)) ./ (maximum(real_arr) - minimum(real_arr))
@@ -105,4 +110,88 @@ function make3d(im::Array{Vector{Float64},2})
     A function for turning a Matrix{Vector{Float64}} to an Array{Float64,3}
     """
     return permutedims([im[I][k] for k=eachindex(im[1,1]),I=CartesianIndices(im)],(2,3,1))
+end
+
+function _normalize_image(image::AbstractArray{<:Real})
+    img_min = minimum(filter(isfinite, image))
+    img_max = maximum(filter(isfinite, image))
+    return (image .- img_min) ./ (img_max - img_min)
+end
+
+function _apply_colormap(image::Array{Float64}, cmap::ColorScheme)
+    height, width = size(image)
+    rgb_array = Array{RGBA{Float32}}(undef, height, width)
+
+    for i in 1:height, j in 1:width
+        if isfinite(image[i, j])
+            color = get(cmap, image[i, j])
+            if typeof(color) <: RGB
+                rgb_array[i, j] = RGBA{Float32}(color, 1.)
+            else
+                rgb_array[i, j] = RGBA{Float32}(color)
+            end
+        else
+            rgb_array[i, j] = RGBA{Float32}(0., 0., 0., 0.)
+        end
+    end
+
+    rgba_image = zeros(Float32, height, width, 4)
+    for i in 1:height, j in 1:width
+            rgba_image[i, j, 1] = red(rgb_array[i, j])
+            rgba_image[i, j, 2] = green(rgb_array[i, j])
+            rgba_image[i, j, 3] = blue(rgb_array[i, j])
+            rgba_image[i, j, 4] = alpha(rgb_array[i, j])
+    end
+
+    return rgba_image
+end
+
+# Method 1: from symbol (e.g., :viridis)
+"
+    image_to_rgb_array(
+        image::AbstractArray{<:Real},
+        colormap::Symbol
+    )
+
+Applies a colormap to a raster image and turns it into a 3D array where the
+four indices in the 3rd axis represent the R, G and B channels plus alpha.
+
+# Arguments
+- `image::AbstractArray{<:Real}`: 2D Raster to be converted.
+- `colormap::Symbol`: Name of the colormap to be applied.
+"
+function image_to_rgb_array(
+    image::AbstractArray{<:Real}, 
+    colormap::Symbol
+)
+    normalized = _normalize_image(image)
+    cmap = getfield(ColorSchemes, colormap)
+    return _apply_colormap(normalized, cmap)
+end
+
+# Method 2: from list of colors
+"
+    image_to_rgb_array(
+        image::AbstractArray{<:Real},
+        colors::AbstractVector{<:Colorant}
+    )
+
+Applies a colormap to a raster image and turns it into a 3D array where the
+three dimensions represent the R, G and B channels.
+
+# Arguments
+- `image::AbstractArray{<:Real}`: 2D Raster to be converted.
+- `colors::AbstractVector{<:Colorant}`: List of colors to use as a colormap.
+"
+function image_to_rgb_array(
+    image::AbstractArray{<:Real}, 
+    colors::AbstractVector
+)
+    colorants = all(isa.(colors, Colorant)) ? colors :
+                all(isa.(colors, Symbol)) ? parse.(Colorant, string.(colors)) :
+                error("colors must be a list of Colorants or Symbols")
+
+    normalized = _normalize_image(image)
+    cmap = ColorScheme(colorants)
+    return _apply_colormap(normalized, cmap)
 end

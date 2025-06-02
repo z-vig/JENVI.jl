@@ -27,11 +27,21 @@ function remove_outliers(
         box_size=bs,
         edge_handling = "extrapolate"
     )
-    # println(round_to_odd(length(spectrum)*0.25))
-    # println("μ=$(length(μ)), spec=$(length(spectrum))")
+
     zscore = (spectrum .- μ) ./ σ
     outlier_idx = abs.(zscore) .> threshold
-    spectrum[outlier_idx] .= μ[outlier_idx]
+
+    neighbors = stack([
+        circshift!(spectrum, -1),
+        circshift!(spectrum, 1)
+    ], dims=2)
+
+    neighbors[1, 2] = NaN
+    neighbors[end, 1] = NaN
+
+    replacement = nanmean(neighbors, 2)
+
+    spectrum[outlier_idx] .= replacement[outlier_idx]
     return spectrum
 end
 
@@ -42,7 +52,15 @@ end
         edge_handling::String="extrapolate"
     )::Tuple{Vector{Float64},Vector{Float64},Vector{Int}}
 
-Smooths the input spectrum using a moving average filter. The function returns the smoothed spectrum, the standard deviation of the smoothed spectrum, and the indices of the smoothed spectrum. The `box_size` parameter determines the size of the moving average filter. The `edge_handling` parameter determines how the edges of the spectrum are handled. The options are "mirror", "extrapolate", "fill_ends", and "cut_ends". The "mirror" option mirrors the spectrum at the edges, the "extrapolate" option extrapolates the spectrum at the edges, the "fill_ends" option fills the ends of the spectrum with the original data, and the "cut_ends" option cuts the ends of the spectrum.
+Smooths the input spectrum using a moving average filter. The function returns
+the smoothed spectrum, the standard deviation of the smoothed spectrum, and
+the indices of the smoothed spectrum. The `box_size` parameter determines the
+size of the moving average filter. The `edge_handling` parameter determines
+how the edges of the spectrum are handled. The options are "mirror",
+"extrapolate", "fill_ends", and "cut_ends". The "mirror" option mirrors the
+spectrum at the edges, the "extrapolate" option extrapolates the spectrum at
+the edges, the "fill_ends" option fills the ends of the spectrum with the
+original data, and the "cut_ends" option cuts the ends of the spectrum.
 
 # Arguments
 - `spec::Vector{<:AbstractFloat}`: The input spectrum to be smoothed.
